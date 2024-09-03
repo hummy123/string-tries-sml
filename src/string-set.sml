@@ -22,7 +22,7 @@ struct
     else
       NONE
 
-  fun binSearch (findChr, keyPos, children) =
+  fun findBinSearch (findChr, keyPos, children) =
     if Vector.length children > 0 then
       helpBinSearch (findChr, keyPos, children, 0, Vector.length children - 1)
     else
@@ -75,7 +75,7 @@ struct
         let
           val findChr = String.sub (searchKey, keyPos)
         in
-          (case binSearch (findChr, keyPos, keys) of
+          (case findBinSearch (findChr, keyPos, keys) of
              SOME idx =>
                let
                  val trieKey = Vector.sub (keys, idx)
@@ -99,7 +99,7 @@ struct
         let
           val findChr = String.sub (searchKey, keyPos)
         in
-          (case binSearch (findChr, keyPos, keys) of
+          (case findBinSearch (findChr, keyPos, keys) of
              SOME idx =>
                let
                  val trieKey = Vector.sub (keys, idx)
@@ -121,12 +121,56 @@ struct
         end
     | FOUND => keyPos = String.size searchKey
 
+  datatype insert_string_match =
+    NO_INSERT_MATCH
+    (* may need to split string if difference found but prefix matched *)
+  | DIFFERENCE_FOUND_AT of int
+    (* no need to do anything if insert key matched, 
+     * as this is a set where only strings are stored *)
+  | FULL_INSERT_MATCH
+    (* if insert key contains trie key, may need to recurse down node *)
+  | INSERT_KEY_CONTAINS_TRIE_KEY
+    (* if trie key contains insert key, need to split node *)
+  | TRIE_KEY_CONTAINS_INSERT_KEY
+
+  fun insertKeyMatch (insertKey, trieKey, keyPos) =
+    if
+      keyPos < String.size insertKey
+    then
+      if keyPos < String.size trieKey then
+        let
+          val searchChr = String.sub (insertKey, keyPos)
+          val trieChr = String.sub (trieKey, keyPos)
+        in
+          if searchChr = trieChr then
+            insertKeyMatch (insertKey, trieKey, keyPos + 1)
+          else
+            DIFFERENCE_FOUND_AT keyPos
+        end
+      else
+        INSERT_KEY_CONTAINS_TRIE_KEY
+    else if
+      keyPos = String.size insertKey
+    then
+      if keyPos < String.size trieKey then TRIE_KEY_CONTAINS_INSERT_KEY
+      else if keyPos = String.size trieKey then FULL_INSERT_MATCH
+      else INSERT_KEY_CONTAINS_TRIE_KEY
+    else 
+      (* implicit: keyPos > String.size insertKey *) 
+      if keyPos <= String.size trieKey then
+        TRIE_KEY_CONTAINS_INSERT_KEY
+      else
+        NO_INSERT_MATCH
+
   (* 
    * todo: 
-   * Code insert function, with an insertKeyMatch helper function
-   * which is similar to the searchKeyMatch helper function,
-   * except that it may also return the index to split a node at
-   * in a new datatype.
+   * Code another function for binary search; this time for insert.
+   * The difference between findBinSearch and insertBinSearch
+   * should be that, while findBinSearch returns NONE if the value is not found,
+   * insertBinSearch should return the appropriate index to insert at
+   * if the value is not found.
+   * The main insert function can then create new key/children vectors,
+   * containing the insertKey and FOUND at the appropriate index.
    *)
 
   fun insert (insKey, keyPos, trie) =
