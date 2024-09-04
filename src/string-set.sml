@@ -157,11 +157,11 @@ struct
                  end
              | FULL_SEARCH_MATCH =>
                  let val node = Vector.sub (children, idx)
-                 in SOME node
+                 in SOME (prefix, node)
                  end
              | TRIE_KEY_CONTAINS_SEARCH_KEY =>
                  let val node = Vector.sub (children, idx)
-                 in SOME node
+                 in SOME (trieKey, node)
                  end)
           end
       | NONE => NONE
@@ -173,13 +173,7 @@ struct
         helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
     | FOUND_WITH_CHILDREN {keys, children} =>
         helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
-    | FOUND =>
-        if keyPos = String.size prefix - 1 then
-          let val node = fromString prefix
-          in SOME node
-          end
-        else
-          NONE
+    | FOUND => NONE
 
   fun getPrefixSubtrie (prefix, trie) = helpGetPrefixSubtrie (prefix, 0, trie)
 
@@ -206,7 +200,10 @@ struct
 
   fun getPrefixList (prefix, trie) =
     case getPrefixSubtrie (prefix, trie) of
-      SOME subtrie => helpGetPrefixList (subtrie, [])
+      SOME (prefix, subtrie) =>
+        let val lst = helpGetPrefixList (subtrie, [])
+        in if isFoundNode subtrie then prefix :: lst else lst
+        end
     | NONE => []
 
   datatype insert_string_match =
@@ -502,12 +499,8 @@ struct
 
   (* 
    * todo:
-   * - Test prefix searching, which turns found strings to list.
+   * - Add removal functionality to remove a key from the list,
+   *   or to mark it is non-found if the key is a prefix 
+   *   of other children.
    *)
-
-  val trie = fromList ["hello", "hit", "hi", "henlo", "help"]
-  val lst = getPrefixList ("hi", trie)
-  val helloExists = exists ("hello", trie)
-  val hitExists = exists ("hit", trie)
-  val hiExists = exists ("hi", trie)
 end
