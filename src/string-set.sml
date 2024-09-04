@@ -200,7 +200,7 @@ struct
             helpInsertBinSearch (findChr, keyPos, children, low, mid - 1)
         end
       else
-        linearSearch (findChr, keyPos, mid, children)
+        linearSearch (findChr, keyPos, if mid >= 0 then mid else 0, children)
     end
 
   fun insertBinSearch (findChr, keyPos, children) =
@@ -237,7 +237,6 @@ struct
 
   (* 
    * todo: 
-   * - Debug the Subscript error raised when calling helpInsert
    * - Complete code for FOUND_WITH_CHILDREN case in insert function.
    *)
 
@@ -426,5 +425,5 @@ struct
         end
     | fromList ([]) = raise Empty
 
-  val trie = fromList ["hello"]
+  val trie = fromList ["hello", "bye", "try", "why"]
 end
