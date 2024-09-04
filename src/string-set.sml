@@ -79,58 +79,64 @@ struct
   fun helpExists (searchKey, keyPos, trie) =
     case trie of
       CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (searchKey, keyPos)
-        in
-          (case findBinSearch (findChr, keyPos, keys) of
-             SOME idx =>
-               let
-                 val trieKey = Vector.sub (keys, idx)
-               in
-                 (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
-                    NO_SEARCH_MATCH => false
-                  | FULL_SEARCH_MATCH =>
-                      let val trieChild = Vector.sub (children, idx)
-                      in isFoundNode trieChild
-                      end
-                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      let
-                        val trieChild = Vector.sub (children, idx)
-                      in
-                        helpExists
-                          (searchKey, keyPos + String.size trieKey, trieChild)
-                      end
-                  | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
-               end
-           | NONE => false)
-        end
+        if keyPos = String.size searchKey then
+          false
+        else
+          let
+            val findChr = String.sub (searchKey, keyPos)
+          in
+            (case findBinSearch (findChr, keyPos, keys) of
+               SOME idx =>
+                 let
+                   val trieKey = Vector.sub (keys, idx)
+                 in
+                   (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
+                      NO_SEARCH_MATCH => false
+                    | FULL_SEARCH_MATCH =>
+                        let val trieChild = Vector.sub (children, idx)
+                        in isFoundNode trieChild
+                        end
+                    | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                        let
+                          val trieChild = Vector.sub (children, idx)
+                        in
+                          helpExists
+                            (searchKey, keyPos + String.size trieKey, trieChild)
+                        end
+                    | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
+                 end
+             | NONE => false)
+          end
     | FOUND_WITH_CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (searchKey, keyPos)
-        in
-          (case findBinSearch (findChr, keyPos, keys) of
-             SOME idx =>
-               let
-                 val trieKey = Vector.sub (keys, idx)
-               in
-                 (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
-                    NO_SEARCH_MATCH => false
-                  | FULL_SEARCH_MATCH =>
-                      let val trieChild = Vector.sub (children, idx)
-                      in isFoundNode trieChild
-                      end
-                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      let
-                        val trieChild = Vector.sub (children, idx)
-                      in
-                        helpExists
-                          (searchKey, keyPos + String.size trieKey, trieChild)
-                      end
-                  | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
-               end
-           | NONE => false)
-        end
-    | FOUND => keyPos = String.size searchKey
+        if keyPos = String.size searchKey then
+          true
+        else
+          let
+            val findChr = String.sub (searchKey, keyPos)
+          in
+            (case findBinSearch (findChr, keyPos, keys) of
+               SOME idx =>
+                 let
+                   val trieKey = Vector.sub (keys, idx)
+                 in
+                   (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
+                      NO_SEARCH_MATCH => false
+                    | FULL_SEARCH_MATCH =>
+                        let val trieChild = Vector.sub (children, idx)
+                        in isFoundNode trieChild
+                        end
+                    | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                        let
+                          val trieChild = Vector.sub (children, idx)
+                        in
+                          helpExists
+                            (searchKey, keyPos + String.size trieKey, trieChild)
+                        end
+                    | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
+                 end
+             | NONE => false)
+          end
+    | FOUND => keyPos = String.size searchKey - 1
 
   fun exists (searchKey, trie) = helpExists (searchKey, 0, trie)
 
@@ -402,8 +408,16 @@ struct
            FOUND_WITH_CHILDREN {keys = keys, children = children}
        (* if insert key contains trie key, need to recurse down node *)
        | INSERT_KEY_CONTAINS_TRIE_KEY =>
-           let val trieChild = Vector.sub (children, insIdx)
-           in helpInsert (insKey, keyPos + String.size trieKey, trieChild)
+           let
+             val trieChild = Vector.sub (children, insIdx)
+             val newTrieChild = helpInsert
+               (insKey, keyPos + String.size trieKey, trieChild)
+             val newChildren =
+               Vector.mapi
+                 (fn (idx, elt) => if idx <> insIdx then elt else newTrieChild)
+                 children
+           in
+             constructor {keys = keys, children = newChildren}
            end
        (* if trie key contains insert key, need to split node *)
        | TRIE_KEY_CONTAINS_INSERT_KEY =>
@@ -411,7 +425,7 @@ struct
              val trieChild = Vector.sub (children, insIdx)
              val newKeys =
                Vector.mapi
-                 (fn (idx, key) => if idx <> insIdx then insKey else key) keys
+                 (fn (idx, key) => if idx <> insIdx then key else insKey) keys
 
              (* newTrieChild should always be FOUND_WITH_CHILDREN,
               * because previous part matches insert key, 
@@ -492,13 +506,16 @@ struct
 
   (* 
    * todo:
-   * - Fix insert function.
-   * - Once insert is fixed, test prefix searching, 
-   *   which turns found strings to list.
+   * - Fix exists function
+   * - Test prefix searching, which turns found strings to list.
    *
-   * Problem with insert function:
-   * The "trie" value below does not contain "hello". It somehow disappeared.
-   * Should probably attempt to create a test suite, to catch regressions as well.
+   * Problem with exists function:
+   * exists ("hello", trie) returns true as expected
+   * but exists ("hellop", trie) also returns true
+   * even though "hellop" was never added.
+   *
+   * "helloz" also returns true, although "hellopo" returns false.
+   * Problem occurs when trieKey length > searchKey length + 1 apparently.
    *)
 
   val trie = fromList ["hello", "hit", "hi"]
