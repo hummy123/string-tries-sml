@@ -180,6 +180,32 @@ struct
 
   fun getPrefixSubtrie (prefix, trie) = helpGetPrefixSubtrie (prefix, 0, trie)
 
+  fun recurseHelpGetPrefixList (pos, keys, children, acc) =
+    if pos < 0 then
+      acc
+    else
+      let
+        val curChild = Vector.sub (children, pos)
+        val acc = helpGetPrefixList (curChild, acc)
+        val acc =
+          if isFoundNode curChild then Vector.sub (keys, pos) :: acc else acc
+      in
+        recurseHelpGetPrefixList (pos - 1, keys, children, acc)
+      end
+
+  and helpGetPrefixList (trie, acc) =
+    case trie of
+      CHILDREN {keys, children} =>
+        recurseHelpGetPrefixList (Vector.length keys - 1, keys, children, acc)
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        recurseHelpGetPrefixList (Vector.length keys - 1, keys, children, acc)
+    | FOUND => acc
+
+  fun getPrefixList (prefix, trie) =
+    case getPrefixSubtrie (prefix, trie) of
+      SOME subtrie => helpGetPrefixList (trie, [])
+    | NONE => []
+
   datatype insert_string_match =
     NO_INSERT_MATCH
   (* may need to split string if difference found but prefix matched *)
@@ -464,8 +490,18 @@ struct
         end
     | fromList ([]) = raise Empty
 
-(* 
- * todo:
- * Implement prefix searching, returning all keys that match a given string prefix.
- *)
+  (* 
+   * todo:
+   * - Fix insert function.
+   * - Once insert is fixed, test prefix searching, 
+   *   which turns found strings to list.
+   *
+   * Problem with insert function:
+   * The "trie" value below does not contain "hello". It somehow disappeared.
+   * Should probably attempt to create a test suite, to catch regressions as well.
+   *)
+
+  val trie = fromList ["hello", "hit", "hi"]
+  val lst = getPrefixList ("hi", trie)
+  val helloExists = exists ("hello", trie)
 end
