@@ -79,17 +79,19 @@ struct
              SOME idx =>
                let
                  val trieKey = Vector.sub (keys, idx)
-                 val nextKeyPos = keyPos + 1
                in
-                 (case searchKeyMatch (searchKey, trieKey, nextKeyPos) of
+                 (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
                     NO_SEARCH_MATCH => false
                   | FULL_SEARCH_MATCH =>
                       let val trieChild = Vector.sub (children, idx)
                       in isFoundNode trieChild
                       end
                   | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      let val trieChild = Vector.sub (children, idx)
-                      in helpExists (searchKey, nextKeyPos, trieChild)
+                      let
+                        val trieChild = Vector.sub (children, idx)
+                      in
+                        helpExists
+                          (searchKey, keyPos + String.size trieKey, trieChild)
                       end
                   | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
                end
@@ -103,17 +105,19 @@ struct
              SOME idx =>
                let
                  val trieKey = Vector.sub (keys, idx)
-                 val nextKeyPos = keyPos + 1
                in
-                 (case searchKeyMatch (searchKey, trieKey, nextKeyPos) of
+                 (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
                     NO_SEARCH_MATCH => false
                   | FULL_SEARCH_MATCH =>
                       let val trieChild = Vector.sub (children, idx)
                       in isFoundNode trieChild
                       end
                   | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      let val trieChild = Vector.sub (children, idx)
-                      in helpExists (searchKey, nextKeyPos, trieChild)
+                      let
+                        val trieChild = Vector.sub (children, idx)
+                      in
+                        helpExists
+                          (searchKey, keyPos + String.size trieKey, trieChild)
                       end
                   | TRIE_KEY_CONTAINS_SEARCH_KEY => false)
                end
@@ -272,10 +276,7 @@ struct
              val splitTrieKeyStart = String.substring (trieKey, 0, diffIdx)
              val trieChild = Vector.sub (children, insIdx)
            in
-             if
-               String.sub (trieKey, diffIdx)
-               > String.sub (insKey, diffIdx)
-             then
+             if String.sub (trieKey, diffIdx) > String.sub (insKey, diffIdx) then
                (* place insKey before trieKey *)
                let
                  val childKeys = Vector.fromList [insKey, trieKey]
@@ -427,16 +428,8 @@ struct
         end
     | fromList ([]) = raise Empty
 
-  (* test trie *)
-  val trie = fromList
-    ["hello", "hi", "bye", "below", "tree", "try", "why", "what"]
-
-  (*
+  (* 
    * todo:
-   * Insertion function works (and seems to work exactly as intended),
-   * but there seems to be a problem with the 'exists' function,
-   * because some strings ("try" and "why") are correctly stored
-   * in the trie, as shown by the REPL,
-   * but 'exists' for them returns false.
+   * Implement prefix searching, returning all keys that match a given string prefix.
    *)
 end
