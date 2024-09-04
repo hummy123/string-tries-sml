@@ -220,7 +220,6 @@ struct
     ) =
     let
       val childNode = CHILDREN {keys = childKeys, children = childChildren}
-
       val keys =
         Vector.mapi
           (fn (idx, key) => if idx <> insIdx then key else splitTrieKeyStart)
@@ -230,9 +229,8 @@ struct
         Vector.mapi (fn (idx, elt) => if idx <> insIdx then elt else childNode)
           parentChildren
 
-      val node = CHILDREN {keys = keys, children = children}
     in
-      SOME node
+      CHILDREN {keys = keys, children = children}
     end
 
   (* 
@@ -240,21 +238,16 @@ struct
    * - Complete code for FOUND_WITH_CHILDREN case in insert function.
    *)
 
-  fun helpInsert (insKey, keyPos, trie) : t option =
+  fun helpInsert (insKey, keyPos, trie) : t =
     case trie of
       FOUND =>
-        let
-          val node =
-            if keyPos = String.size insKey then
-              FOUND
-            else
-              FOUND_WITH_CHILDREN
-                { keys = Vector.fromList [insKey]
-                , children = Vector.fromList [FOUND]
-                }
-        in
-          SOME node
-        end
+        if keyPos = String.size insKey then
+          FOUND
+        else
+          FOUND_WITH_CHILDREN
+            { keys = Vector.fromList [insKey]
+            , children = Vector.fromList [FOUND]
+            }
     | CHILDREN {keys, children} =>
         let
           val findChr = String.sub (insKey, keyPos)
@@ -273,9 +266,8 @@ struct
                    else if idx > insIdx then Vector.sub (children, idx - 1)
                    else FOUND)
 
-                 val node = CHILDREN {keys = newKeys, children = newChildren}
                in
-                 SOME node
+                 CHILDREN {keys = newKeys, children = newChildren}
                end
            | FOUND_INSERT_POS insIdx =>
                let
@@ -283,7 +275,7 @@ struct
                  val nextKeyPos = keyPos + 1
                in
                  (case insertKeyMatch (insKey, trieKey, nextKeyPos) of
-                    NO_INSERT_MATCH => SOME trie
+                    NO_INSERT_MATCH => trie
                   (* may need to split string if difference found but prefix matched *)
                   | DIFFERENCE_FOUND_AT diffIdx =>
                       let
@@ -342,23 +334,14 @@ struct
                    * however, if this is a non-found node, then I need to change
                    * the tag/case. *)
                   | FULL_INSERT_MATCH =>
-                      let
-                        val node =
-                          FOUND_WITH_CHILDREN {keys = keys, children = children}
-                      in
-                        SOME node
-                      end
+                      FOUND_WITH_CHILDREN {keys = keys, children = children}
                   (* if insert key contains trie key, need to recurse down node *)
                   | INSERT_KEY_CONTAINS_TRIE_KEY =>
                       let
                         val trieChild = Vector.sub (children, insIdx)
                       in
-                        (case
-                           helpInsert
-                             (insKey, keyPos + String.size trieKey, trieChild)
-                         of
-                           (result as SOME _) => result
-                         | NONE => SOME trie)
+                        helpInsert
+                          (insKey, keyPos + String.size trieKey, trieChild)
                       end
                   (* if trie key contains insert key, need to split node *)
                   | TRIE_KEY_CONTAINS_INSERT_KEY =>
@@ -385,10 +368,8 @@ struct
                                if idx <> insIdx then elt else newTrieChild)
                             children
 
-                        val node =
-                          CHILDREN {keys = newKeys, children = newChildren}
                       in
-                        SOME node
+                        CHILDREN {keys = newKeys, children = newChildren}
                       end)
                end
            | APPEND_NEW_CHILD =>
@@ -396,20 +377,14 @@ struct
                  val newKeys = Vector.concat [keys, Vector.fromList [insKey]]
                  val newChildren = Vector.concat
                    [children, Vector.fromList [FOUND]]
-                 val node = CHILDREN {keys = newKeys, children = newChildren}
                in
-                 SOME node
+                 CHILDREN {keys = newKeys, children = newChildren}
                end)
         end
     | FOUND_WITH_CHILDREN {keys, children} => raise Empty (* todo *)
 
   fun insert (insKey, trie) =
-    if String.size insKey > 0 then
-      case helpInsert (insKey, 0, trie) of
-        SOME trie => trie
-      | NONE => trie
-    else
-      trie
+    if String.size insKey > 0 then helpInsert (insKey, 0, trie) else trie
 
   fun fromString str =
     CHILDREN {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
