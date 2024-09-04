@@ -211,14 +211,17 @@ struct
     ( insKey
     , insIdx
     , splitTrieKeyStart
-    , splitTrieKeyEnd
     , trieChild
     , childKeys
     , childChildren
     , parentKeys
     , parentChildren
+    , parentConstructor
     ) =
     let
+      (* child node should always have CHILDREN case,
+       * because we are splitting prefix into two,
+       * when neither trieKey nor insKey match the prefix. *)
       val childNode = CHILDREN {keys = childKeys, children = childChildren}
       val keys =
         Vector.mapi
@@ -228,15 +231,9 @@ struct
       val children =
         Vector.mapi (fn (idx, elt) => if idx <> insIdx then elt else childNode)
           parentChildren
-
     in
-      CHILDREN {keys = keys, children = children}
+      parentConstructor {keys = keys, children = children}
     end
-
-  (* 
-   * todo: 
-   * - Complete code for FOUND_WITH_CHILDREN case in insert function.
-   *)
 
   fun insertNewChild (keys, insIdx, insKey, children, constructor) =
     let
@@ -250,7 +247,6 @@ struct
         if idx < insIdx then Vector.sub (children, idx)
         else if idx > insIdx then Vector.sub (children, idx - 1)
         else FOUND)
-
     in
       constructor {keys = newKeys, children = newChildren}
     end
@@ -261,6 +257,99 @@ struct
       val newChildren = Vector.concat [children, Vector.fromList [FOUND]]
     in
       constructor {keys = newKeys, children = newChildren}
+    end
+
+  fun foundInsertPos
+    (keys, children, keyPos, insKey, insIdx, trie, helpInsert, constructor) =
+    let
+      val trieKey = Vector.sub (keys, insIdx)
+      val nextKeyPos = keyPos + 1
+    in
+      (case insertKeyMatch (insKey, trieKey, nextKeyPos) of
+       (* may need to split string if difference found but prefix matched *)
+         DIFFERENCE_FOUND_AT diffIdx =>
+           let
+             val splitTrieKeyStart = String.substring (trieKey, 0, diffIdx)
+             val trieChild = Vector.sub (children, insIdx)
+           in
+             if
+               String.sub (trieKey, diffIdx)
+               > String.sub (insKey, diffIdx)
+             then
+               (* place insKey before trieKey *)
+               let
+                 val childKeys = Vector.fromList [insKey, trieKey]
+                 val childChildren = Vector.fromList [FOUND, trieChild]
+               in
+                 insertDifferenceFoundAt
+                   ( insKey
+                   , insIdx
+                   , splitTrieKeyStart
+                   , trieChild
+                   , childKeys
+                   , childChildren
+                   , keys
+                   , children
+                   , constructor
+                   )
+               end
+             else
+               (* place trieKey before insKey *)
+               let
+                 val childKeys = Vector.fromList [trieKey, insKey]
+                 val childChildren = Vector.fromList [trieChild, FOUND]
+               in
+                 insertDifferenceFoundAt
+                   ( insKey
+                   , insIdx
+                   , splitTrieKeyStart
+                   , trieChild
+                   , childKeys
+                   , childChildren
+                   , keys
+                   , children
+                   , constructor
+                   )
+               end
+           end
+       (* may not need to do anything if insert key matched, 
+        * as this is a set where only strings are stored. 
+        * however, if this is a non-found node, then I need to change
+        * the tag/case. *)
+       | FULL_INSERT_MATCH =>
+           (* in case of a full match, 
+            * returned node should always be FOUND_WITH_CHILDREN,
+            * because full match means this key was inserted into the trie. *)
+           FOUND_WITH_CHILDREN {keys = keys, children = children}
+       (* if insert key contains trie key, need to recurse down node *)
+       | INSERT_KEY_CONTAINS_TRIE_KEY =>
+           let val trieChild = Vector.sub (children, insIdx)
+           in helpInsert (insKey, keyPos + String.size trieKey, trieChild)
+           end
+       (* if trie key contains insert key, need to split node *)
+       | TRIE_KEY_CONTAINS_INSERT_KEY =>
+           let
+             val trieChild = Vector.sub (children, insIdx)
+             val newKeys =
+               Vector.mapi
+                 (fn (idx, key) => if idx <> insIdx then insKey else key) keys
+
+             (* newTrieChild should always be FOUND_WITH_CHILDREN,
+              * because previous part matches insert key, 
+              * and esecond part matches trieKey *)
+             val newTrieChild = FOUND_WITH_CHILDREN
+               { keys = Vector.fromList [trieKey]
+               , children = Vector.fromList [trieChild]
+               }
+
+             val newChildren =
+               Vector.mapi
+                 (fn (idx, elt) => if idx <> insIdx then elt else newTrieChild)
+                 children
+           in
+             constructor {keys = newKeys, children = newChildren}
+           end
+       | NO_INSERT_MATCH => trie)
     end
 
   fun helpInsert (insKey, keyPos, trie) : t =
@@ -281,108 +370,16 @@ struct
              INSERT_NEW_CHILD insIdx =>
                insertNewChild (keys, insIdx, insKey, children, CHILDREN)
            | FOUND_INSERT_POS insIdx =>
-               let
-                 val trieKey = Vector.sub (keys, insIdx)
-                 val nextKeyPos = keyPos + 1
-               in
-                 (case insertKeyMatch (insKey, trieKey, nextKeyPos) of
-                    NO_INSERT_MATCH => trie
-                  (* may need to split string if difference found but prefix matched *)
-                  | DIFFERENCE_FOUND_AT diffIdx =>
-                      let
-                        val splitTrieKeyStart =
-                          String.substring (trieKey, 0, diffIdx)
-                        val splitTrieKeyEnd = String.substring
-                          (trieKey, diffIdx, String.size trieKey - diffIdx)
-                        val trieChild = Vector.sub (children, insIdx)
-                      in
-                        if
-                          String.sub (trieKey, nextKeyPos)
-                          > String.sub (insKey, nextKeyPos)
-                        then
-                          (* place insKey before trieKey *)
-                          let
-                            val childKeys =
-                              Vector.fromList [insKey, splitTrieKeyEnd]
-                            val childChildren =
-                              Vector.fromList [FOUND, trieChild]
-                          in
-                            insertDifferenceFoundAt
-                              ( insKey
-                              , insIdx
-                              , splitTrieKeyStart
-                              , splitTrieKeyEnd
-                              , trieChild
-                              , childKeys
-                              , childChildren
-                              , keys
-                              , children
-                              )
-                          end
-                        else
-                          (* place trieKey before insKey *)
-                          let
-                            val childKeys =
-                              Vector.fromList [splitTrieKeyEnd, insKey]
-                            val childChildren =
-                              Vector.fromList [trieChild, FOUND]
-                          in
-                            insertDifferenceFoundAt
-                              ( insKey
-                              , insIdx
-                              , splitTrieKeyStart
-                              , splitTrieKeyEnd
-                              , trieChild
-                              , childKeys
-                              , childChildren
-                              , keys
-                              , children
-                              )
-                          end
-                      end
-                  (* may not need to do anything if insert key matched, 
-                   * as this is a set where only strings are stored. 
-                   * however, if this is a non-found node, then I need to change
-                   * the tag/case. *)
-                  | FULL_INSERT_MATCH =>
-                      FOUND_WITH_CHILDREN {keys = keys, children = children}
-                  (* if insert key contains trie key, need to recurse down node *)
-                  | INSERT_KEY_CONTAINS_TRIE_KEY =>
-                      let
-                        val trieChild = Vector.sub (children, insIdx)
-                      in
-                        helpInsert
-                          (insKey, keyPos + String.size trieKey, trieChild)
-                      end
-                  (* if trie key contains insert key, need to split node *)
-                  | TRIE_KEY_CONTAINS_INSERT_KEY =>
-                      let
-                        val trieChild = Vector.sub (children, insIdx)
-                        val newKeys =
-                          Vector.mapi
-                            (fn (idx, key) =>
-                               if idx <> insIdx then insKey else key) keys
-
-                        val splitTrieKeyEnd = String.substring
-                          ( trieKey
-                          , String.size insKey
-                          , String.size trieKey - String.size insKey
-                          )
-                        val newTrieChild = FOUND_WITH_CHILDREN
-                          { keys = Vector.fromList [splitTrieKeyEnd]
-                          , children = Vector.fromList [trieChild]
-                          }
-
-                        val newChildren =
-                          Vector.mapi
-                            (fn (idx, elt) =>
-                               if idx <> insIdx then elt else newTrieChild)
-                            children
-
-                      in
-                        CHILDREN {keys = newKeys, children = newChildren}
-                      end)
-               end
+               foundInsertPos
+                 ( keys
+                 , children
+                 , keyPos
+                 , insKey
+                 , insIdx
+                 , trie
+                 , helpInsert
+                 , CHILDREN
+                 )
            | APPEND_NEW_CHILD =>
                appendNewChild (keys, insKey, children, CHILDREN))
         end
@@ -394,7 +391,17 @@ struct
              INSERT_NEW_CHILD insIdx =>
                insertNewChild
                  (keys, insIdx, insKey, children, FOUND_WITH_CHILDREN)
-           | FOUND_INSERT_POS insIdx => raise Empty
+           | FOUND_INSERT_POS insIdx =>
+               foundInsertPos
+                 ( keys
+                 , children
+                 , keyPos
+                 , insKey
+                 , insIdx
+                 , trie
+                 , helpInsert
+                 , FOUND_WITH_CHILDREN
+                 )
            | APPEND_NEW_CHILD =>
                appendNewChild (keys, insKey, children, FOUND_WITH_CHILDREN))
         end
@@ -403,7 +410,11 @@ struct
     if String.size insKey > 0 then helpInsert (insKey, 0, trie) else trie
 
   fun fromString str =
-    CHILDREN {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
+    if String.size str > 0 then
+      CHILDREN
+        {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
+    else
+      raise Empty
 
   fun helpAddList (str, acc) = insert (str, acc)
 
@@ -416,5 +427,16 @@ struct
         end
     | fromList ([]) = raise Empty
 
-  val trie = fromList ["hello", "bye", "try", "why"]
+  (* test trie *)
+  val trie = fromList
+    ["hello", "hi", "bye", "below", "tree", "try", "why", "what"]
+
+  (*
+   * todo:
+   * Insertion function works (and seems to work exactly as intended),
+   * but there seems to be a problem with the 'exists' function,
+   * because some strings ("try" and "why") are correctly stored
+   * in the trie, as shown by the REPL,
+   * but 'exists' for them returns false.
+   *)
 end
