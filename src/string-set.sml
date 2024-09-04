@@ -238,6 +238,31 @@ struct
    * - Complete code for FOUND_WITH_CHILDREN case in insert function.
    *)
 
+  fun insertNewChild (keys, insIdx, insKey, children, constructor) =
+    let
+      val newLength = Vector.length keys + 1
+      val newKeys = Vector.tabulate (newLength, fn idx =>
+        if idx < insIdx then Vector.sub (keys, idx)
+        else if idx > insIdx then Vector.sub (keys, idx - 1)
+        else insKey)
+
+      val newChildren = Vector.tabulate (newLength, fn idx =>
+        if idx < insIdx then Vector.sub (children, idx)
+        else if idx > insIdx then Vector.sub (children, idx - 1)
+        else FOUND)
+
+    in
+      constructor {keys = newKeys, children = newChildren}
+    end
+
+  fun appendNewChild (keys, insKey, children, constructor) =
+    let
+      val newKeys = Vector.concat [keys, Vector.fromList [insKey]]
+      val newChildren = Vector.concat [children, Vector.fromList [FOUND]]
+    in
+      constructor {keys = newKeys, children = newChildren}
+    end
+
   fun helpInsert (insKey, keyPos, trie) : t =
     case trie of
       FOUND =>
@@ -254,21 +279,7 @@ struct
         in
           (case insertBinSearch (findChr, keyPos, keys) of
              INSERT_NEW_CHILD insIdx =>
-               let
-                 val newLength = Vector.length keys + 1
-                 val newKeys = Vector.tabulate (newLength, fn idx =>
-                   if idx < insIdx then Vector.sub (keys, idx)
-                   else if idx > insIdx then Vector.sub (keys, idx - 1)
-                   else insKey)
-
-                 val newChildren = Vector.tabulate (newLength, fn idx =>
-                   if idx < insIdx then Vector.sub (children, idx)
-                   else if idx > insIdx then Vector.sub (children, idx - 1)
-                   else FOUND)
-
-               in
-                 CHILDREN {keys = newKeys, children = newChildren}
-               end
+               insertNewChild (keys, insIdx, insKey, children, CHILDREN)
            | FOUND_INSERT_POS insIdx =>
                let
                  val trieKey = Vector.sub (keys, insIdx)
@@ -373,15 +384,20 @@ struct
                       end)
                end
            | APPEND_NEW_CHILD =>
-               let
-                 val newKeys = Vector.concat [keys, Vector.fromList [insKey]]
-                 val newChildren = Vector.concat
-                   [children, Vector.fromList [FOUND]]
-               in
-                 CHILDREN {keys = newKeys, children = newChildren}
-               end)
+               appendNewChild (keys, insKey, children, CHILDREN))
         end
-    | FOUND_WITH_CHILDREN {keys, children} => raise Empty (* todo *)
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        let
+          val findChr = String.sub (insKey, keyPos)
+        in
+          (case insertBinSearch (findChr, keyPos, keys) of
+             INSERT_NEW_CHILD insIdx =>
+               insertNewChild
+                 (keys, insIdx, insKey, children, FOUND_WITH_CHILDREN)
+           | FOUND_INSERT_POS insIdx => raise Empty
+           | APPEND_NEW_CHILD =>
+               appendNewChild (keys, insKey, children, FOUND_WITH_CHILDREN))
+        end
 
   fun insert (insKey, trie) =
     if String.size insKey > 0 then helpInsert (insKey, 0, trie) else trie
