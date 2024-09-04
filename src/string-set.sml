@@ -207,16 +207,6 @@ struct
     helpInsertBinSearch
       (findChr, keyPos, children, 0, Vector.length children - 1)
 
-  (* 
-   * todo: 
-   * Complete code for CHILDREN and FOUND_WITH_CHILDREN cases in insert function.
-   * The start will be similar to the exists function, 
-   * with binary search possibly followed by a string matching comparison.
-   * No string matching comparison is needed if the current char is not found
-   * in the binary search stage, however; 
-   * instead, we will insert a new element into the array when that happens.
-   *)
-
   fun insertDifferenceFoundAt
     ( insKey
     , insIdx
@@ -245,6 +235,11 @@ struct
       SOME node
     end
 
+  (* 
+   * todo: 
+   * - Debug the Subscript error raised when calling helpInsert
+   * - Complete code for FOUND_WITH_CHILDREN case in insert function.
+   *)
 
   fun helpInsert (insKey, keyPos, trie) : t option =
     case trie of
@@ -416,4 +411,14 @@ struct
       | NONE => trie
     else
       trie
+
+  fun fromString str =
+    CHILDREN {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
+
+  fun helpAddList (str, acc) = insert (str, acc)
+
+  fun addList (lst, trie) =
+    List.foldl helpAddList trie lst
+
+  val trie = let val trie = fromString "hello" in addList (["bye"], trie) end
 end
