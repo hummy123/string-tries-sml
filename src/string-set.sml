@@ -420,5 +420,11 @@ struct
   fun addList (lst, trie) =
     List.foldl helpAddList trie lst
 
-  val trie = let val trie = fromString "hello" in addList (["bye"], trie) end
+  fun fromList (hd :: tl) =
+        let val trie = fromString hd
+        in addList (tl, trie)
+        end
+    | fromList ([]) = raise Empty
+
+  val trie = fromList ["hello"]
 end
