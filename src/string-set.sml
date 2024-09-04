@@ -506,19 +506,6 @@ struct
 
   (* 
    * todo:
-   * - Fix exists function
    * - Test prefix searching, which turns found strings to list.
-   *
-   * Problem with exists function:
-   * exists ("hello", trie) returns true as expected
-   * but exists ("hellop", trie) also returns true
-   * even though "hellop" was never added.
-   *
-   * "helloz" also returns true, although "hellopo" returns false.
-   * Problem occurs when trieKey length > searchKey length + 1 apparently.
    *)
-
-  val trie = fromList ["hello", "hit", "hi"]
-  val lst = getPrefixList ("hi", trie)
-  val helloExists = exists ("hello", trie)
 end
