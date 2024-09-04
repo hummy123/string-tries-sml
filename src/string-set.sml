@@ -5,6 +5,13 @@ struct
   | FOUND_WITH_CHILDREN of {keys: string vector, children: t vector}
   | FOUND
 
+  fun fromString str =
+    if String.size str > 0 then
+      CHILDREN
+        {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
+    else
+      raise Empty
+
   fun helpBinSearch (findChr, keyPos, children, low, high) =
     if high >= low then
       let
@@ -126,6 +133,52 @@ struct
     | FOUND => keyPos = String.size searchKey
 
   fun exists (searchKey, trie) = helpExists (searchKey, 0, trie)
+
+  fun helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie) =
+    let
+      val findChr = String.sub (prefix, keyPos)
+    in
+      case findBinSearch (findChr, keyPos, keys) of
+        SOME idx =>
+          let
+            val trieKey = Vector.sub (keys, idx)
+          in
+            (case searchKeyMatch (prefix, trieKey, keyPos + 1) of
+               NO_SEARCH_MATCH => NONE
+             | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                 let
+                   val trieChild = Vector.sub (children, idx)
+                 in
+                   helpGetPrefixSubtrie
+                     (prefix, keyPos + String.size trieKey, trieChild)
+                 end
+             | FULL_SEARCH_MATCH =>
+                 let val node = Vector.sub (children, idx)
+                 in SOME node
+                 end
+             | TRIE_KEY_CONTAINS_SEARCH_KEY =>
+                 let val node = Vector.sub (children, idx)
+                 in SOME node
+                 end)
+          end
+      | NONE => NONE
+    end
+
+  and helpGetPrefixSubtrie (prefix, keyPos, trie) =
+    case trie of
+      CHILDREN {keys, children} =>
+        helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
+    | FOUND =>
+        if keyPos = String.size prefix then
+          let val node = fromString prefix
+          in SOME node
+          end
+        else
+          NONE
+
+  fun getPrefixSubtrie (prefix, trie) = helpGetPrefixSubtrie (prefix, 0, trie)
 
   datatype insert_string_match =
     NO_INSERT_MATCH
@@ -263,8 +316,7 @@ struct
       constructor {keys = newKeys, children = newChildren}
     end
 
-  fun foundInsertPos
-    (keys, children, keyPos, insKey, insIdx, trie, helpInsert, constructor) =
+  fun foundInsertPos (keys, children, keyPos, insKey, insIdx, trie, constructor) =
     let
       val trieKey = Vector.sub (keys, insIdx)
       val nextKeyPos = keyPos + 1
@@ -353,7 +405,7 @@ struct
        | NO_INSERT_MATCH => trie)
     end
 
-  fun helpInsert (insKey, keyPos, trie) : t =
+  and helpInsert (insKey, keyPos, trie) : t =
     case trie of
       FOUND =>
         if keyPos = String.size insKey then
@@ -372,15 +424,7 @@ struct
                insertNewChild (keys, insIdx, insKey, children, CHILDREN)
            | FOUND_INSERT_POS insIdx =>
                foundInsertPos
-                 ( keys
-                 , children
-                 , keyPos
-                 , insKey
-                 , insIdx
-                 , trie
-                 , helpInsert
-                 , CHILDREN
-                 )
+                 (keys, children, keyPos, insKey, insIdx, trie, CHILDREN)
            | APPEND_NEW_CHILD =>
                appendNewChild (keys, insKey, children, CHILDREN))
         end
@@ -400,7 +444,6 @@ struct
                  , insKey
                  , insIdx
                  , trie
-                 , helpInsert
                  , FOUND_WITH_CHILDREN
                  )
            | APPEND_NEW_CHILD =>
@@ -409,13 +452,6 @@ struct
 
   fun insert (insKey, trie) =
     if String.size insKey > 0 then helpInsert (insKey, 0, trie) else trie
-
-  fun fromString str =
-    if String.size str > 0 then
-      CHILDREN
-        {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
-    else
-      raise Empty
 
   fun helpAddList (str, acc) = insert (str, acc)
 
@@ -428,8 +464,8 @@ struct
         end
     | fromList ([]) = raise Empty
 
-  (* 
-   * todo:
-   * Implement prefix searching, returning all keys that match a given string prefix.
-   *)
+(* 
+ * todo:
+ * Implement prefix searching, returning all keys that match a given string prefix.
+ *)
 end
