@@ -5,12 +5,17 @@ struct
   | FOUND_WITH_CHILDREN of {keys: string vector, children: t vector}
   | FOUND
 
+  val empty =
+    CHILDREN {keys = Vector.fromList [], children = Vector.fromList []}
+
+  fun isEmpty trie = trie = empty
+
   fun fromString str =
     if String.size str > 0 then
       CHILDREN
         {keys = Vector.fromList [str], children = Vector.fromList [FOUND]}
     else
-      raise Empty
+      empty
 
   fun helpBinSearch (findChr, keyPos, children, low, high) =
     if high >= low then
@@ -136,7 +141,14 @@ struct
          *)
         false
 
-  fun exists (searchKey, trie) = helpExists (searchKey, 0, trie)
+  fun exists (searchKey, trie) =
+    if isEmpty trie orelse String.size searchKey = 0 then false
+    else helpExists (searchKey, 0, trie)
+
+  datatype prefix_result =
+    PREFIX_FOUND of string * t
+  | NO_PREFIX_FOUND
+  | PREFIX_MATCHES_WHOLE_TRIE
 
   fun helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie) =
     let
@@ -148,7 +160,7 @@ struct
             val trieKey = Vector.sub (keys, idx)
           in
             (case searchKeyMatch (prefix, trieKey, keyPos + 1) of
-               NO_SEARCH_MATCH => NONE
+               NO_SEARCH_MATCH => NO_PREFIX_FOUND
              | SEARCH_KEY_CONTAINS_TRIE_KEY =>
                  let
                    val trieChild = Vector.sub (children, idx)
@@ -157,14 +169,14 @@ struct
                  end
              | FULL_SEARCH_MATCH =>
                  let val node = Vector.sub (children, idx)
-                 in SOME (prefix, node)
+                 in PREFIX_FOUND (prefix, node)
                  end
              | TRIE_KEY_CONTAINS_SEARCH_KEY =>
                  let val node = Vector.sub (children, idx)
-                 in SOME (trieKey, node)
+                 in PREFIX_FOUND (trieKey, node)
                  end)
           end
-      | NONE => NONE
+      | NONE => NO_PREFIX_FOUND
     end
 
   and helpGetPrefixSubtrie (prefix, keyPos, trie) =
@@ -173,9 +185,12 @@ struct
         helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
     | FOUND_WITH_CHILDREN {keys, children} =>
         helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie)
-    | FOUND => NONE
+    | FOUND => NO_PREFIX_FOUND
 
-  fun getPrefixSubtrie (prefix, trie) = helpGetPrefixSubtrie (prefix, 0, trie)
+  fun getPrefixSubtrie (prefix, trie) =
+    if isEmpty trie then NO_PREFIX_FOUND
+    else if String.size prefix > 0 then helpGetPrefixSubtrie (prefix, 0, trie)
+    else PREFIX_MATCHES_WHOLE_TRIE
 
   fun recurseHelpGetPrefixList (pos, keys, children, acc) =
     if pos < 0 then
@@ -200,11 +215,12 @@ struct
 
   fun getPrefixList (prefix, trie) =
     case getPrefixSubtrie (prefix, trie) of
-      SOME (prefix, subtrie) =>
+      PREFIX_FOUND (prefix, subtrie) =>
         let val lst = helpGetPrefixList (subtrie, [])
         in if isFoundNode subtrie then prefix :: lst else lst
         end
-    | NONE => []
+    | NO_PREFIX_FOUND => []
+    | PREFIX_MATCHES_WHOLE_TRIE => helpGetPrefixList (trie, [])
 
   datatype insert_string_match =
     NO_INSERT_MATCH
@@ -484,7 +500,9 @@ struct
         end
 
   fun insert (insKey, trie) =
-    if String.size insKey > 0 then helpInsert (insKey, 0, trie) else trie
+    if isEmpty trie then fromString insKey
+    else if String.size insKey > 0 then helpInsert (insKey, 0, trie)
+    else trie
 
   fun helpAddList (str, acc) = insert (str, acc)
 
@@ -495,12 +513,12 @@ struct
         let val trie = fromString hd
         in addList (tl, trie)
         end
-    | fromList ([]) = raise Empty
+    | fromList ([]) = empty
 
-  (* 
-   * todo:
-   * - Add removal functionality to remove a key from the list,
-   *   or to mark it is non-found if the key is a prefix 
-   *   of other children.
-   *)
+(* 
+ * todo:
+ * - Add removal functionality to remove a key from the list,
+ *   or to mark it is non-found if the key is a prefix 
+ *   of other children.
+ *)
 end
