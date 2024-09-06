@@ -188,9 +188,11 @@ struct
     | FOUND => NO_PREFIX_FOUND
 
   fun getPrefixSubtrie (prefix, trie) =
-    if isEmpty trie then NO_PREFIX_FOUND
-    else if String.size prefix > 0 then helpGetPrefixSubtrie (prefix, 0, trie)
-    else PREFIX_MATCHES_WHOLE_TRIE
+    if String.size prefix > 0 then
+      if isEmpty trie then NO_PREFIX_FOUND
+      else helpGetPrefixSubtrie (prefix, 0, trie)
+    else
+      PREFIX_MATCHES_WHOLE_TRIE
 
   fun recurseHelpGetPrefixList (pos, keys, children, acc) =
     if pos < 0 then
@@ -500,9 +502,10 @@ struct
         end
 
   fun insert (insKey, trie) =
-    if isEmpty trie then fromString insKey
-    else if String.size insKey > 0 then helpInsert (insKey, 0, trie)
-    else trie
+    if String.size insKey > 0 then
+      if isEmpty trie then fromString insKey else helpInsert (insKey, 0, trie)
+    else
+      trie
 
   fun helpAddList (str, acc) = insert (str, acc)
 
@@ -515,10 +518,174 @@ struct
         end
     | fromList ([]) = empty
 
+  (* 
+   * todo:
+   * - Add removal functionality to remove a key from the list,
+   *   or to mark it is non-found if the key is a prefix 
+   *   of other children.
+   *)
+
+  datatype remove_result =
+    UNCHANGED
+  | MADE_EMPTY
+  | CHANGED of t
+
+  (* should be called when there is a FULL_SEARCH_MATCH
+   * and child is a terminal FOUND node *)
+  fun removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor) =
+    (* if child was made empty, then:
+     * -  if the parent only has 1 child, it should be MADE_EMPTY too
+     * -  otherwise, just remove the key and child at this idx from parent
+     * *)
+    if Vector.length keys > 1 then
+      let
+        val newKeys = Vector.tabulate (Vector.length keys - 1, fn keyIdx =>
+          Vector.sub (keys, if keyIdx >= idx then keyIdx - 1 else keyIdx))
+
+        val newChildren =
+          Vector.tabulate (Vector.length keys - 1, fn childIdx =>
+            Vector.sub
+              (children, if childIdx >= idx then childIdx - 1 else childIdx))
+
+        val newNode = parentConstructor {keys = newKeys, children = newChildren}
+      in
+        CHANGED newNode
+      end
+    else
+      MADE_EMPTY
+
+  (* should be called when searchKeyMatch returns FULL_MATCH
+   *in helpRemove function *)
+  fun removeWhenFullMatch (idx, keys, children, parentConstructor) =
+    (* matching over the child at this idx *)
+    case Vector.sub (children, idx) of
+    (* CHILDREN is a not-found case, so have to leave parent unchanged
+     * as there is no key to delete. *)
+      CHILDREN _ => UNCHANGED
+    (* FOUND_WITH_CHILDREN is a found case containing links to other nodes
+     * so we just need to change the tag from FOUND_WITH_CHILDREN to CHILDREN *)
+    | FOUND_WITH_CHILDREN {keys = childKeys, children = childChildren} =>
+        let
+          val newChild = CHILDREN {keys = childKeys, children = childChildren}
+          val newParentChildren =
+            Vector.mapi
+              (fn (mapIdx, elt) => if mapIdx <> idx then elt else newChild)
+              children
+
+          val newParent =
+            parentConstructor {keys = keys, children = newParentChildren}
+        in
+          CHANGED newParent
+        end
+    | FOUND =>
+        removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor)
+
+  fun removeWhenSearchKeyContainsTrieKey
+    (childResult, idx, keys, children, parentConstructor) =
+    case childResult of
+    (* if result is UNCHANGED, let UNCHANGED bubble to the top.
+     * At the top, can return same trie given as input as there was no
+     * change. *)
+      UNCHANGED => UNCHANGED
+    (* if child was changed, allocate new vector where child at this idx
+     * is updated with newChild, and use it in parent node. *)
+    | CHANGED newChild =>
+        let
+          val newChildren =
+            Vector.mapi
+              (fn (childIdx, elt) => if idx <> childIdx then elt else newChild)
+              children
+
+          val newNode = parentConstructor {keys = keys, children = newChildren}
+        in
+          CHANGED newNode
+        end
+    | MADE_EMPTY =>
+        removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor)
+
+  fun helpRemove (removeKey, keyPos, trie) =
+    case trie of
+      CHILDREN {keys, children} =>
+        let
+          val findChr = String.sub (removeKey, keyPos)
+        in
+          (case findBinSearch (findChr, keyPos, keys) of
+             SOME idx =>
+               let
+                 val trieKey = Vector.sub (keys, idx)
+               in
+                 (case searchKeyMatch (removeKey, trieKey, keyPos + 1) of
+                  (* no search match means nothing to delete *)
+                    NO_SEARCH_MATCH => UNCHANGED
+                  | FULL_SEARCH_MATCH =>
+                      removeWhenFullMatch (idx, keys, children, CHILDREN)
+                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                      removeWhenSearchKeyContainsTrieKey
+                        ( helpRemove
+                            ( removeKey
+                            , String.size trieKey
+                            , Vector.sub (children, idx)
+                            )
+                        , idx
+                        , keys
+                        , children
+                        , CHILDREN
+                        )
+                  | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
+               end
+           | NONE => UNCHANGED)
+        end
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        let
+          val findChr = String.sub (removeKey, keyPos)
+        in
+          (case findBinSearch (findChr, keyPos, keys) of
+             SOME idx =>
+               let
+                 val trieKey = Vector.sub (keys, idx)
+               in
+                 (case searchKeyMatch (removeKey, trieKey, keyPos + 1) of
+                  (* no search match means nothing to delete *)
+                    NO_SEARCH_MATCH => UNCHANGED
+                  | FULL_SEARCH_MATCH =>
+                      removeWhenFullMatch
+                        (idx, keys, children, FOUND_WITH_CHILDREN)
+                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                      removeWhenSearchKeyContainsTrieKey
+                        ( helpRemove
+                            ( removeKey
+                            , String.size trieKey
+                            , Vector.sub (children, idx)
+                            )
+                        , idx
+                        , keys
+                        , children
+                        , FOUND_WITH_CHILDREN
+                        )
+                  | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
+               end
+           | NONE => UNCHANGED)
+        end
+    | FOUND =>
+        (*
+         * This case should only occur if we recurse in a node 
+         * when there is a partial, but not full, string match.
+         * Since there was no full string match, 
+         * key doesn't exist in trie and so we must leave it unchanged.
+         *)
+        UNCHANGED
+
+  fun remove (removeKey, trie) =
+    if String.size removeKey = 0 orelse isEmpty trie then
+      trie
+    else
+      case helpRemove (removeKey, 0, trie) of
+        CHANGED trie => trie
+      | MADE_EMPTY => empty
+      | UNCHANGED => trie
+
 (* 
- * todo:
- * - Add removal functionality to remove a key from the list,
- *   or to mark it is non-found if the key is a prefix 
- *   of other children.
- *)
+ * todo: 
+ * test remove functionality 
+ * *)
 end
