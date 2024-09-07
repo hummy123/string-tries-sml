@@ -50,10 +50,26 @@ struct
       print "StringSet.getPrefixList passed all tests\n"
     end
 
+  fun remove1 () =
+  let
+    val trie = StringSet.fromList ["a", "ab", "abc"]
+
+    val _ = assertTrue (StringSet.exists ("a", trie), "a exists before remove1")
+
+    val trie = StringSet.remove ("a", trie)
+    val _ = assertFalse (StringSet.exists ("a", trie), "a does not exist after remove1")
+
+    val _ = assertTrue (StringSet.exists ("ab", trie), "ab still exists after remove1")
+    val _ = assertTrue (StringSet.exists ("abc", trie), "abc still exists after remove1")
+  in
+    print "StringSet.remove: passed remove1\n"
+  end
+
   fun run () =
     let
       val _ = testExists ()
       val _ = testGetPrefixList ()
+      val _ = remove1 ()
     in
       ()
     end
