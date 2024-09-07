@@ -532,7 +532,8 @@ struct
 
   (* should be called when there is a FULL_SEARCH_MATCH
    * and child is a terminal FOUND node *)
-  fun removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor) =
+  fun removeWhenChildIsMadeEmpty
+    (idx, keys, children, isFoundWithChildren, parentConstructor) =
     (* if child was made empty, then:
      * -  if the parent only has 1 child, it should be MADE_EMPTY too
      * -  otherwise, just remove the key and child at this idx from parent
@@ -569,12 +570,23 @@ struct
         in
           CHANGED newNode
         end
-    else
-      MADE_EMPTY
+    else 
+      (* if the caller was from the FOUND_WITH_CHILDREN case,
+       * then, instead of deleting this node entirely, 
+       * we only delete this node's children, and mark this node 
+       * as found. 
+       * However, in general case where this is a CHILDREN node 
+       * whose key was not inserted into the trie, 
+       * we should fully delete this node as well. *)
+      if isFoundWithChildren then
+        CHANGED FOUND
+      else
+        MADE_EMPTY
 
   (* should be called when searchKeyMatch returns FULL_MATCH
    *in helpRemove function *)
-  fun removeWhenFullMatch (idx, keys, children, parentConstructor) =
+  fun removeWhenFullMatch
+    (idx, keys, children, isFoundWithChildren, parentConstructor) =
     (* matching over the child at this idx *)
     case Vector.sub (children, idx) of
     (* CHILDREN is a not-found case, so have to leave parent unchanged
@@ -596,10 +608,11 @@ struct
           CHANGED newParent
         end
     | FOUND =>
-        removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor)
+        removeWhenChildIsMadeEmpty
+          (idx, keys, children, isFoundWithChildren, parentConstructor)
 
   fun removeWhenSearchKeyContainsTrieKey
-    (childResult, idx, keys, children, parentConstructor) =
+    (childResult, idx, keys, children, isFoundWithChildren, parentConstructor) =
     case childResult of
     (* if result is UNCHANGED, let UNCHANGED bubble to the top.
      * At the top, can return same trie given as input as there was no
@@ -619,7 +632,8 @@ struct
           CHANGED newNode
         end
     | MADE_EMPTY =>
-        removeWhenChildIsMadeEmpty (idx, keys, children, parentConstructor)
+        removeWhenChildIsMadeEmpty
+          (idx, keys, children, isFoundWithChildren, parentConstructor)
 
   fun helpRemove (removeKey, keyPos, trie) =
     case trie of
@@ -636,7 +650,7 @@ struct
                   (* no search match means nothing to delete *)
                     NO_SEARCH_MATCH => UNCHANGED
                   | FULL_SEARCH_MATCH =>
-                      removeWhenFullMatch (idx, keys, children, CHILDREN)
+                      removeWhenFullMatch (idx, keys, children, false, CHILDREN)
                   | SEARCH_KEY_CONTAINS_TRIE_KEY =>
                       removeWhenSearchKeyContainsTrieKey
                         ( helpRemove
@@ -647,6 +661,7 @@ struct
                         , idx
                         , keys
                         , children
+                        , false
                         , CHILDREN
                         )
                   | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
@@ -667,7 +682,7 @@ struct
                     NO_SEARCH_MATCH => UNCHANGED
                   | FULL_SEARCH_MATCH =>
                       removeWhenFullMatch
-                        (idx, keys, children, FOUND_WITH_CHILDREN)
+                        (idx, keys, children, true, FOUND_WITH_CHILDREN)
                   | SEARCH_KEY_CONTAINS_TRIE_KEY =>
                       removeWhenSearchKeyContainsTrieKey
                         ( helpRemove
@@ -678,6 +693,7 @@ struct
                         , idx
                         , keys
                         , children
+                        , true
                         , FOUND_WITH_CHILDREN
                         )
                   | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
@@ -701,9 +717,4 @@ struct
         CHANGED trie => trie
       | MADE_EMPTY => empty
       | UNCHANGED => trie
-
-(* 
- * todo: 
- * test remove functionality 
- * *)
 end

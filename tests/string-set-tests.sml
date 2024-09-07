@@ -126,8 +126,6 @@ struct
       val trie = StringSet.remove ("x", trie)
       val _ = assertFalse (StringSet.exists ("x", trie), "x does not exist after remove in remove5")
 
-      (* error: "abc" should exist at this point, but it seems not to. 
-       * find out why and fix. *)
       val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists before remove in remove5")
       val trie = StringSet.remove ("abc", trie)
       val _ = assertFalse (StringSet.exists ("abc", trie), "abc does not exist after remove in remove5")
