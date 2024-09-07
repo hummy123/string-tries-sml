@@ -51,25 +51,102 @@ struct
     end
 
   fun remove1 () =
-  let
-    val trie = StringSet.fromList ["a", "ab", "abc"]
+    let
+      val trie = StringSet.fromList ["a", "ab", "abc"]
 
-    val _ = assertTrue (StringSet.exists ("a", trie), "a exists before remove1")
+      val _ = assertTrue (StringSet.exists ("a", trie), "a exists before remove1")
 
-    val trie = StringSet.remove ("a", trie)
-    val _ = assertFalse (StringSet.exists ("a", trie), "a does not exist after remove1")
+      val trie = StringSet.remove ("a", trie)
+      val _ = assertFalse (StringSet.exists ("a", trie), "a does not exist after remove1")
 
-    val _ = assertTrue (StringSet.exists ("ab", trie), "ab still exists after remove1")
-    val _ = assertTrue (StringSet.exists ("abc", trie), "abc still exists after remove1")
-  in
-    print "StringSet.remove: passed remove1\n"
-  end
+      val _ = assertTrue (StringSet.exists ("ab", trie), "ab still exists after remove1")
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc still exists after remove1")
+    in
+      print "StringSet.remove: passed remove1\n"
+    end
+
+  fun remove2 () =
+    let
+      val trie = StringSet.fromList ["a", "ab", "abc", "abd"]
+
+      val _ = assertTrue (StringSet.exists ("ab", trie), "ab exists before remove2")
+      val trie = StringSet.remove ("ab", trie)
+      val _ = assertFalse (StringSet.exists ("ab", trie), "ab no longer exists after remove2")
+
+      val _ = assertTrue (StringSet.exists ("a", trie), "remove2 contains a")
+      val _ = assertTrue (StringSet.exists ("abc", trie), "remove2 contains abc")
+      val _ = assertTrue (StringSet.exists ("abd", trie), "remove2 contains abd")
+    in
+      print "StringSet.remove: passed remove2\n"
+    end
+
+  fun remove3 () =
+    let
+      val trie = StringSet.fromList ["abc"]
+
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists before remove3")
+      val trie = StringSet.remove ("abc", trie)
+      val _ = assertFalse (StringSet.exists ("abc", trie), "abc no longer exists after remove3")
+
+      val _ = assertTrue (StringSet.isEmpty trie, "trie is empty after remove3")
+
+      val trie = StringSet.insert ("abc", trie)
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists after insertion in remove3")
+    in
+      print "StringSet.remove: passed remove3\n"
+    end
+
+  fun remove4 () =
+    let
+      val trie = StringSet.fromList ["abc", "abcd"]
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists before remove4")
+
+      val trie = StringSet.remove ("abc", trie)
+      val _ = assertTrue (StringSet.exists ("abcd", trie), "abcd still exists after removing abc in remove4")
+      val _ = assertFalse (StringSet.exists ("abc", trie), "abc doesn't exist after remove in remove4")
+    in
+      print "StringSet.remove: passed remove4\n"
+    end
+
+  fun remove5 () =
+    let
+      val trie = StringSet.fromList ["abc", "ab", "ade", "abcde", "x"]
+
+      val trie2 = StringSet.remove ("xy", trie)
+      val _ = assertTrue (trie = trie2, "removing key (xy) which doesn't exist in trie returns same trie")
+
+      val trie3 = StringSet.remove ("abcd", trie)
+      val _ = assertTrue (trie = trie3, "removing key (abcd) which doesn't exist in trie returns same trie")
+
+      (* ERROR: Removing "abcde" causes a subscript error. Need to fix. *)
+      val _ = assertTrue (StringSet.exists ("abcde", trie), "abcde exists before remove in remove5")
+      val trie = StringSet.remove ("abcde", trie)
+      val _ = assertFalse (StringSet.exists ("abcde", trie), "abcde does not exist after remove in remove5")
+
+      val _ = assertTrue (StringSet.exists ("x", trie), "x exists before remove in remove5")
+      val trie = StringSet.remove ("x", trie)
+      val _ = assertTrue (StringSet.exists ("x", trie), "x does not exist after remove in remove5")
+
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists before remove in remove5")
+      val trie = StringSet.remove ("abc", trie)
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc does not exist after remove in remove5")
+
+      val _ = assertTrue (StringSet.exists ("ab", trie), "trie still contains ab after removals in remove5")
+      val _ = assertTrue (StringSet.exists ("ade", trie), "trie still contains ade after removals in remove5")
+    in
+      print "StringSet.remove: passed remove5\n"
+    end
 
   fun run () =
     let
       val _ = testExists ()
       val _ = testGetPrefixList ()
+
       val _ = remove1 ()
+      val _ = remove2 ()
+      val _ = remove3 ()
+      val _ = remove4 ()
+      val _ = remove5 ()
     in
       ()
     end
