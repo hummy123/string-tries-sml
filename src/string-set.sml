@@ -224,6 +224,8 @@ struct
     | NO_PREFIX_FOUND => []
     | PREFIX_MATCHES_WHOLE_TRIE => helpGetPrefixList (trie, [])
 
+  fun toList trie = helpGetPrefixList (trie, [])
+
   datatype insert_string_match =
     NO_INSERT_MATCH
   (* may need to split string if difference found but prefix matched *)
