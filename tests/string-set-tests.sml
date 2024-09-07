@@ -118,18 +118,19 @@ struct
       val trie3 = StringSet.remove ("abcd", trie)
       val _ = assertTrue (trie = trie3, "removing key (abcd) which doesn't exist in trie returns same trie")
 
-      (* ERROR: Removing "abcde" causes a subscript error. Need to fix. *)
       val _ = assertTrue (StringSet.exists ("abcde", trie), "abcde exists before remove in remove5")
       val trie = StringSet.remove ("abcde", trie)
       val _ = assertFalse (StringSet.exists ("abcde", trie), "abcde does not exist after remove in remove5")
 
       val _ = assertTrue (StringSet.exists ("x", trie), "x exists before remove in remove5")
       val trie = StringSet.remove ("x", trie)
-      val _ = assertTrue (StringSet.exists ("x", trie), "x does not exist after remove in remove5")
+      val _ = assertFalse (StringSet.exists ("x", trie), "x does not exist after remove in remove5")
 
+      (* error: "abc" should exist at this point, but it seems not to. 
+       * find out why and fix. *)
       val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists before remove in remove5")
       val trie = StringSet.remove ("abc", trie)
-      val _ = assertTrue (StringSet.exists ("abc", trie), "abc does not exist after remove in remove5")
+      val _ = assertFalse (StringSet.exists ("abc", trie), "abc does not exist after remove in remove5")
 
       val _ = assertTrue (StringSet.exists ("ab", trie), "trie still contains ab after removals in remove5")
       val _ = assertTrue (StringSet.exists ("ade", trie), "trie still contains ade after removals in remove5")

@@ -538,19 +538,37 @@ struct
      * -  otherwise, just remove the key and child at this idx from parent
      * *)
     if Vector.length keys > 1 then
-      let
-        val newKeys = Vector.tabulate (Vector.length keys - 1, fn keyIdx =>
-          Vector.sub (keys, if keyIdx >= idx then keyIdx - 1 else keyIdx))
+      if idx > 0 then
+        let
+          val newKeys = Vector.tabulate (Vector.length keys - 1, fn keyIdx =>
+            Vector.sub (keys, if keyIdx >= idx then keyIdx - 1 else keyIdx))
 
-        val newChildren =
-          Vector.tabulate (Vector.length keys - 1, fn childIdx =>
-            Vector.sub
-              (children, if childIdx >= idx then childIdx - 1 else childIdx))
+          val newChildren =
+            Vector.tabulate (Vector.length keys - 1, fn childIdx =>
+              Vector.sub
+                (children, if childIdx >= idx then childIdx - 1 else childIdx))
 
-        val newNode = parentConstructor {keys = newKeys, children = newChildren}
-      in
-        CHANGED newNode
-      end
+          val newNode =
+            parentConstructor {keys = newKeys, children = newChildren}
+        in
+          CHANGED newNode
+        end
+      else
+        (* if idx = 0, then have to slice first element off from vector *)
+        let
+          val keySlice = VectorSlice.slice (keys, 1, SOME
+            (Vector.length keys - 1))
+          val newKeys = VectorSlice.vector keySlice
+
+          val childrenSlice = VectorSlice.slice (children, 1, SOME
+            (Vector.length children - 1))
+          val newChildren = VectorSlice.vector childrenSlice
+
+          val newNode =
+            parentConstructor {keys = newKeys, children = newChildren}
+        in
+          CHANGED newNode
+        end
     else
       MADE_EMPTY
 
