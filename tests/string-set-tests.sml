@@ -144,7 +144,45 @@ struct
       val trie = StringSet.insert ("abc", trie)
       val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists after being addedd to trie")
     in
-      print "StringSet.insert: passed add1\n"
+      print "StringSet.insert: passed insert1\n"
+    end
+
+  fun insert2 () =
+    let
+      val trie = StringSet.fromList ["abc"]
+      val trie2 = StringSet.insert ("abc", trie)
+
+      val _ = assertTrue (trie = trie2, "trie handles duplicate insertion by returning same trie")
+    in
+      print "StringSet.insert: passed insert2\n"
+    end
+
+    fun insert3 () =
+      let
+        val trie = StringSet.empty
+        val _ = assertFalse (StringSet.exists ("abcd", trie), "empty trie does not contain abcd")
+
+        val trie = StringSet.insert ("abcd", trie)
+        val _ = assertTrue (StringSet.exists ("abcd", trie), "abcd exists after inserting it into empty trie")
+        val _ = assertFalse (StringSet.exists ("abc", trie), "abc does not exist before inserting it")
+
+        val trie = StringSet.insert ("abc", trie)
+        val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists after inserting it into trie")
+
+        val trie = StringSet.remove ("abc", trie)
+        val _ = assertFalse (StringSet.exists ("abc", trie), "abc does not exist after removing it from trie")
+      in
+        print "StringSet.insert: passed insert3\n"
+      end
+
+  fun getPrefixList () =
+    let
+      val trie = StringSet.fromList ["z", "xc", "x", "zzz", "abc", "abcde"]
+      val lst = StringSet.getPrefixList ("ab", trie)
+
+      val _ = assertTrue (lst = ["abc", "abcde"], "prefix list contains abc and abcde when prefix is 'ab'")
+    in
+      print "StringSet.getPrefixList: passed\n"
     end
 
   fun run () =
@@ -159,6 +197,10 @@ struct
       val _ = remove5 ()
 
       val _ = insert1 ()
+      val _ = insert2 ()
+      val _ = insert3 ()
+
+      val _ = getPrefixList ()
     in
       ()
     end
