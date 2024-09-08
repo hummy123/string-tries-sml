@@ -416,9 +416,24 @@ struct
         * the tag/case. *)
        | FULL_INSERT_MATCH =>
            (* in case of a full match, 
-            * returned node should always be FOUND_WITH_CHILDREN,
-            * because full match means this key was inserted into the trie. *)
-           FOUND_WITH_CHILDREN {keys = keys, children = children}
+            * need to turn child into FOUND_WITH_CHILDREN
+            * or FOUND case, if it not already either
+            *)
+           (case Vector.sub (children, insIdx) of
+              CHILDREN {keys = childKeys, children = childChildren} =>
+                let
+                  val newTrieChild =
+                    FOUND_WITH_CHILDREN
+                      {keys = childKeys, children = childChildren}
+                  val newParentChildren =
+                    Vector.mapi
+                      (fn (childIdx, elt) =>
+                         if insIdx <> childIdx then elt else newTrieChild)
+                      children
+                in
+                  constructor {keys = keys, children = newParentChildren}
+                end
+            | _ => trie)
        (* if insert key contains trie key, need to recurse down node *)
        | INSERT_KEY_CONTAINS_TRIE_KEY =>
            let
@@ -572,18 +587,16 @@ struct
         in
           CHANGED newNode
         end
-    else 
-      (* if the caller was from the FOUND_WITH_CHILDREN case,
-       * then, instead of deleting this node entirely, 
-       * we only delete this node's children, and mark this node 
-       * as found. 
-       * However, in general case where this is a CHILDREN node 
-       * whose key was not inserted into the trie, 
-       * we should fully delete this node as well. *)
-      if isFoundWithChildren then
-        CHANGED FOUND
-      else
-        MADE_EMPTY
+    else (* if the caller was from the FOUND_WITH_CHILDREN case,
+          * then, instead of deleting this node entirely, 
+          * we only delete this node's children, and mark this node 
+          * as found. 
+          * However, in general case where this is a CHILDREN node 
+          * whose key was not inserted into the trie, 
+          * we should fully delete this node as well. *) if isFoundWithChildren then
+      CHANGED FOUND
+    else
+      MADE_EMPTY
 
   (* should be called when searchKeyMatch returns FULL_MATCH
    *in helpRemove function *)

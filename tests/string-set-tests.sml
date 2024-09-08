@@ -136,6 +136,17 @@ struct
       print "StringSet.remove: passed remove5\n"
     end
 
+  fun insert1 () = 
+    let
+      val trie = StringSet.empty
+      val _ = assertFalse (StringSet.exists ("abc", trie), "abc does not exist before it is added to trie")
+
+      val trie = StringSet.insert ("abc", trie)
+      val _ = assertTrue (StringSet.exists ("abc", trie), "abc exists after being addedd to trie")
+    in
+      print "StringSet.insert: passed add1\n"
+    end
+
   fun run () =
     let
       val _ = testExists ()
@@ -146,6 +157,8 @@ struct
       val _ = remove3 ()
       val _ = remove4 ()
       val _ = remove5 ()
+
+      val _ = insert1 ()
     in
       ()
     end
