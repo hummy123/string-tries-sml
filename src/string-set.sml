@@ -1,24 +1,34 @@
 signature STRING_SET =
 sig
+  (* the type of tries *)
   type t
 
+  (* the empty trie *)
   val empty: t
 
+  (* returns true if the trie is empty *)
   val isEmpty: t -> bool
 
+  (* creates a trie containing just a string *)
   val fromString: string -> t
 
+  (* returns true if the key was inserted into the trie *)
   val exists: string * t -> bool
 
-  val getPrefixList: string * t -> string list
-
+  (* inserts a new string into the trie, returning a new trie *)
   val insert: string * t -> t
 
+  (* removes the key from the trie, returning a new trie *)
   val remove: string * t -> t
 
-  val fromList: string list -> t
+  (* returns a list of all keys matching the specified prefix *)
+  val getPrefixList: string * t -> string list
 
+  (* returns a list containing all keys in the trie *)
   val toList: t -> string list
+
+  (* returns a trie containing all keys in the string list *)
+  val fromList: string list -> t
 end
 
 structure StringSet: STRING_SET =
@@ -557,13 +567,6 @@ struct
         in addList (tl, trie)
         end
     | fromList ([]) = empty
-
-  (* 
-   * todo:
-   * - Add removal functionality to remove a key from the list,
-   *   or to mark it is non-found if the key is a prefix 
-   *   of other children.
-   *)
 
   datatype remove_result =
     UNCHANGED
