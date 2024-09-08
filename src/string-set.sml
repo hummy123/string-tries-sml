@@ -1,4 +1,27 @@
-structure StringSet =
+signature STRING_SET =
+sig
+  type t
+
+  val empty: t
+
+  val isEmpty: t -> bool
+
+  val fromString: string -> t
+
+  val exists: string * t -> bool
+
+  val getPrefixList: string * t -> string list
+
+  val insert: string * t -> t
+
+  val remove: string * t -> t
+
+  val fromList: string list -> t
+
+  val toList: t -> string list
+end
+
+structure StringSet: STRING_SET =
 struct
   datatype t =
     CHILDREN of {keys: string vector, children: t vector}
