@@ -583,6 +583,21 @@ struct
        | NO_INSERT_MATCH => trie)
     end
 
+  and helpInsertChildren
+    (insKey, keyPos, keys, children, trie, parentConstructor) =
+    let
+      val findChr = String.sub (insKey, keyPos)
+    in
+      (case insertBinSearch (findChr, keyPos, keys) of
+         INSERT_NEW_CHILD insIdx =>
+           insertNewChild (keys, insIdx, insKey, children, parentConstructor)
+       | FOUND_INSERT_POS insIdx =>
+           foundInsertPos
+             (keys, children, keyPos, insKey, insIdx, trie, parentConstructor)
+       | APPEND_NEW_CHILD =>
+           appendNewChild (keys, insKey, children, parentConstructor))
+    end
+
   and helpInsert (insKey, keyPos, trie) : t =
     case trie of
       FOUND =>
@@ -594,39 +609,10 @@ struct
             , children = Vector.fromList [FOUND]
             }
     | CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (insKey, keyPos)
-        in
-          (case insertBinSearch (findChr, keyPos, keys) of
-             INSERT_NEW_CHILD insIdx =>
-               insertNewChild (keys, insIdx, insKey, children, CHILDREN)
-           | FOUND_INSERT_POS insIdx =>
-               foundInsertPos
-                 (keys, children, keyPos, insKey, insIdx, trie, CHILDREN)
-           | APPEND_NEW_CHILD =>
-               appendNewChild (keys, insKey, children, CHILDREN))
-        end
+        helpInsertChildren (insKey, keyPos, keys, children, trie, CHILDREN)
     | FOUND_WITH_CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (insKey, keyPos)
-        in
-          (case insertBinSearch (findChr, keyPos, keys) of
-             INSERT_NEW_CHILD insIdx =>
-               insertNewChild
-                 (keys, insIdx, insKey, children, FOUND_WITH_CHILDREN)
-           | FOUND_INSERT_POS insIdx =>
-               foundInsertPos
-                 ( keys
-                 , children
-                 , keyPos
-                 , insKey
-                 , insIdx
-                 , trie
-                 , FOUND_WITH_CHILDREN
-                 )
-           | APPEND_NEW_CHILD =>
-               appendNewChild (keys, insKey, children, FOUND_WITH_CHILDREN))
-        end
+        helpInsertChildren
+          (insKey, keyPos, keys, children, trie, FOUND_WITH_CHILDREN)
 
   fun insert (insKey, trie) =
     if String.size insKey > 0 then
@@ -750,71 +736,52 @@ struct
         removeWhenChildIsMadeEmpty
           (idx, keys, children, isFoundWithChildren, parentConstructor)
 
-  fun helpRemove (removeKey, keyPos, trie) =
+  fun helpRemoveChildren
+    (removeKey, keyPos, keys, children, isFoundWithChildren, parentConstructor) =
+    let
+      val findChr = String.sub (removeKey, keyPos)
+    in
+      (case findBinSearch (findChr, keyPos, keys) of
+         SOME idx =>
+           let
+             val trieKey = Vector.sub (keys, idx)
+           in
+             (case searchKeyMatch (removeKey, trieKey, keyPos + 1) of
+              (* no search match means nothing to delete *)
+                NO_SEARCH_MATCH => UNCHANGED
+              | FULL_SEARCH_MATCH =>
+                  removeWhenFullMatch
+                    ( idx
+                    , keys
+                    , children
+                    , isFoundWithChildren
+                    , parentConstructor
+                    )
+              | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+                  removeWhenSearchKeyContainsTrieKey
+                    ( helpRemove
+                        ( removeKey
+                        , String.size trieKey
+                        , Vector.sub (children, idx)
+                        )
+                    , idx
+                    , keys
+                    , children
+                    , isFoundWithChildren
+                    , parentConstructor
+                    )
+              | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
+           end
+       | NONE => UNCHANGED)
+    end
+
+  and helpRemove (removeKey, keyPos, trie) =
     case trie of
       CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (removeKey, keyPos)
-        in
-          (case findBinSearch (findChr, keyPos, keys) of
-             SOME idx =>
-               let
-                 val trieKey = Vector.sub (keys, idx)
-               in
-                 (case searchKeyMatch (removeKey, trieKey, keyPos + 1) of
-                  (* no search match means nothing to delete *)
-                    NO_SEARCH_MATCH => UNCHANGED
-                  | FULL_SEARCH_MATCH =>
-                      removeWhenFullMatch (idx, keys, children, false, CHILDREN)
-                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      removeWhenSearchKeyContainsTrieKey
-                        ( helpRemove
-                            ( removeKey
-                            , String.size trieKey
-                            , Vector.sub (children, idx)
-                            )
-                        , idx
-                        , keys
-                        , children
-                        , false
-                        , CHILDREN
-                        )
-                  | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
-               end
-           | NONE => UNCHANGED)
-        end
+        helpRemoveChildren (removeKey, keyPos, keys, children, false, CHILDREN)
     | FOUND_WITH_CHILDREN {keys, children} =>
-        let
-          val findChr = String.sub (removeKey, keyPos)
-        in
-          (case findBinSearch (findChr, keyPos, keys) of
-             SOME idx =>
-               let
-                 val trieKey = Vector.sub (keys, idx)
-               in
-                 (case searchKeyMatch (removeKey, trieKey, keyPos + 1) of
-                  (* no search match means nothing to delete *)
-                    NO_SEARCH_MATCH => UNCHANGED
-                  | FULL_SEARCH_MATCH =>
-                      removeWhenFullMatch
-                        (idx, keys, children, true, FOUND_WITH_CHILDREN)
-                  | SEARCH_KEY_CONTAINS_TRIE_KEY =>
-                      removeWhenSearchKeyContainsTrieKey
-                        ( helpRemove
-                            ( removeKey
-                            , String.size trieKey
-                            , Vector.sub (children, idx)
-                            )
-                        , idx
-                        , keys
-                        , children
-                        , true
-                        , FOUND_WITH_CHILDREN
-                        )
-                  | TRIE_KEY_CONTAINS_SEARCH_KEY => UNCHANGED)
-               end
-           | NONE => UNCHANGED)
-        end
+        helpRemoveChildren
+          (removeKey, keyPos, keys, children, true, FOUND_WITH_CHILDREN)
     | FOUND =>
         (*
          * This case should only occur if we recurse in a node 
