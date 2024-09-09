@@ -67,7 +67,10 @@ struct
   val empty =
     CHILDREN {keys = Vector.fromList [], children = Vector.fromList []}
 
-  fun isEmpty trie = trie = empty
+  fun isEmpty trie =
+    case trie of
+      CHILDREN {keys, ...} => Vector.length keys = 0
+    | _ => false
 
   fun fromString str =
     if String.size str > 0 then
