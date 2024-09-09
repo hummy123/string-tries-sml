@@ -156,7 +156,7 @@ struct
     | FOUND_WITH_CHILDREN _ => true
     | CHILDREN _ => false
 
-  fun checkNodeMatch (searchKey, trieKey, keyPos, children, idx) =
+  fun checkNodeExistsMatch (searchKey, trieKey, keyPos, children, idx) =
     (case searchKeyMatch (searchKey, trieKey, keyPos + 1) of
        NO_SEARCH_MATCH => false
      | FULL_SEARCH_MATCH =>
@@ -181,12 +181,12 @@ struct
             checkExistsLeft (searchKey, searchChr, keyPos, ktl, ctl)
           else if firstNodeChr = searchChr then
             (* check if there is a full/partial key match at this node *)
-            checkNodeMatch (searchKey, firstNode, keyPos, chd, 0)
+            checkNodeExistsMatch (searchKey, firstNode, keyPos, chd, 0)
           else
             (* binary search this node to see if there is a matching chr *)
             (case findBinSearch (searchChr, keyPos, khd) of
                SOME idx =>
-                 checkNodeMatch
+                 checkNodeExistsMatch
                    (searchKey, Vector.sub (khd, idx), keyPos, chd, idx)
              | NONE => false)
         end
@@ -204,13 +204,13 @@ struct
             checkExistsRight (searchKey, searchChr, keyPos, ktl, ctl)
           else if lastNodeChr = searchChr then
             (* check for full/partial match at this node *)
-            checkNodeMatch
+            checkNodeExistsMatch
               (searchKey, lastNode, keyPos, chd, Vector.length khd - 1)
           else
             (* binary search this node to see if there is a matching chr *)
             (case findBinSearch (searchChr, keyPos, khd) of
                SOME idx =>
-                 checkNodeMatch
+                 checkNodeExistsMatch
                    (searchKey, Vector.sub (khd, idx), keyPos, chd, idx)
              | NONE => false)
         end
@@ -230,7 +230,7 @@ struct
           else if searchChr = startNodeChr then
             (* check string match on first key/firstNode
              * and recurse if full or partial match *)
-            checkNodeMatch (searchKey, firstNode, keyPos, chd, 0)
+            checkNodeExistsMatch (searchKey, firstNode, keyPos, chd, 0)
           else
             (* implicit: searchChr > startNodeChr *)
             let
@@ -244,7 +244,7 @@ struct
               else if searchChr = lastNodeChr then
                 (* check string match on last key/lastNode
                  * and recurse if full or partial match *)
-                checkNodeMatch
+                checkNodeExistsMatch
                   (searchKey, lastNode, keyPos, chd, Vector.length khd - 1)
               else
                 (* implicit: searchChr < lastNodeChr 
@@ -252,7 +252,7 @@ struct
                  * to find if key exists *)
                 (case findBinSearch (searchChr, keyPos, khd) of
                    SOME idx =>
-                     checkNodeMatch
+                     checkNodeExistsMatch
                        (searchKey, Vector.sub (khd, idx), keyPos, chd, idx)
                  | NONE => false)
             end
@@ -281,4 +281,136 @@ struct
   fun exists (searchKey, trie) =
     if isEmpty trie orelse String.size searchKey = 0 then false
     else recurseExists (searchKey, 0, trie)
+
+  fun checkNodeSubtrieMatch (prefix, trieKey, keyPos, children, idx) =
+    case searchKeyMatch (prefix, trieKey, keyPos + 1) of
+      NO_SEARCH_MATCH => NONE
+    | SEARCH_KEY_CONTAINS_TRIE_KEY =>
+        let val trieChild = Vector.sub (children, idx)
+        in recurseGetPrefixSubtrie (prefix, String.size trieKey, trieChild)
+        end
+    | FULL_SEARCH_MATCH =>
+        let val node = Vector.sub (children, idx)
+        in SOME (prefix, node)
+        end
+    | TRIE_KEY_CONTAINS_SEARCH_KEY =>
+        let val node = Vector.sub (children, idx)
+        in SOME (trieKey, node)
+        end
+
+  and helpGetPrefixSubtrieChildren (prefix, keyPos, keys, children, trie) =
+    let
+      val findChr = String.sub (prefix, keyPos)
+    in
+      case findBinSearch (findChr, keyPos, keys) of
+        SOME idx =>
+          let val trieKey = Vector.sub (keys, idx)
+          in checkNodeSubtrieMatch (prefix, trieKey, keyPos, children, idx)
+          end
+      | NONE => NONE
+    end
+
+  and getPrefixSubtrieLeft (prefix, searchChr, keyPos, leftKeys, leftChildren) =
+    case (leftKeys, leftChildren) of
+      (khd :: ktl, chd :: ctl) =>
+        let
+          val firstNode = Vector.sub (khd, 0)
+          val firstNodeChr = String.sub (firstNode, keyPos)
+        in
+          if firstNodeChr < searchChr then
+            (* keep moving leftwards *)
+            getPrefixSubtrieLeft (prefix, searchChr, keyPos, ktl, ctl)
+          else if firstNodeChr = searchChr then
+            (* check if there is a full/partial key match at this node *)
+            checkNodeSubtrieMatch (prefix, firstNode, keyPos, chd, 0)
+          else
+            (* binary search this node to see if there is a matching chr *)
+            (case findBinSearch (searchChr, keyPos, khd) of
+               SOME idx =>
+                 checkNodeSubtrieMatch
+                   (prefix, Vector.sub (khd, idx), keyPos, chd, idx)
+             | NONE => NONE)
+        end
+    | (_, _) => NONE
+
+  and getPrefixSubtrieRight
+    (prefix, searchChr, keyPos, rightKeys, rightChildren) =
+    case (rightKeys, rightChildren) of
+      (khd :: ktl, chd :: ctl) =>
+        let
+          val lastNode = Vector.sub (khd, Vector.length khd - 1)
+          val lastNodeChr = String.sub (lastNode, keyPos)
+        in
+          if lastNodeChr > searchChr then
+            (* keep checking rightwards *)
+            getPrefixSubtrieRight (prefix, searchChr, keyPos, ktl, ctl)
+          else if lastNodeChr = searchChr then
+            (* check for full/partial match at this node *)
+            checkNodeSubtrieMatch
+              (prefix, lastNode, keyPos, chd, Vector.length khd - 1)
+          else
+            (* binary search this node to see if there is a matching chr *)
+            (case findBinSearch (searchChr, keyPos, khd) of
+               SOME idx =>
+                 checkNodeSubtrieMatch
+                   (prefix, Vector.sub (khd, idx), keyPos, chd, idx)
+             | NONE => NONE)
+        end
+    | (_, _) => NONE
+
+  and decideGetPrefixSubtrieDirection
+    (prefix, keyPos, leftKeys, leftChildren, rightKeys, rightChildren) =
+    case (leftKeys, leftChildren) of
+      (khd :: ktl, chd :: ctl) =>
+        let
+          val searchChr = String.sub (prefix, keyPos)
+          val firstNode = Vector.sub (khd, 0)
+          val startNodeChr = String.sub (firstNode, keyPos)
+        in
+          if searchChr < startNodeChr then
+            getPrefixSubtrieLeft (prefix, searchChr, keyPos, ktl, ctl)
+          else if searchChr = startNodeChr then
+            (* check string match on first key/firstNode
+             * and recurse if full or partial match *)
+            checkNodeSubtrieMatch (prefix, firstNode, keyPos, chd, 0)
+          else
+            (* implicit: searchChr > startNodeChr *)
+            let
+              val lastNode = Vector.sub (khd, Vector.length khd - 1)
+              val lastNodeChr = String.sub (lastNode, keyPos)
+            in
+              if searchChr > lastNodeChr then
+                (* check rightKeys/rightChildren *)
+                getPrefixSubtrieRight
+                  (prefix, searchChr, keyPos, rightKeys, rightChildren)
+              else if searchChr = lastNodeChr then
+                (* check string match on last key/lastNode
+                 * and recurse if full or partial match *)
+                checkNodeSubtrieMatch
+                  (prefix, lastNode, keyPos, chd, Vector.length khd - 1)
+              else
+                (* implicit: searchChr < lastNodeChr 
+                 * should perform binary search at this node 
+                 * to find if key exists *)
+                (case findBinSearch (searchChr, keyPos, khd) of
+                   SOME idx =>
+                     checkNodeSubtrieMatch
+                       (prefix, Vector.sub (khd, idx), keyPos, chd, idx)
+                 | NONE => NONE)
+            end
+        end
+    | (_, _) => NONE
+
+  and recurseGetPrefixSubtrie (prefix, keyPos, trie) =
+    case trie of
+      CHILDREN {leftKeys, leftChildren, rightKeys, rightChildren} =>
+        decideGetPrefixSubtrieDirection
+          (prefix, keyPos, leftKeys, leftChildren, rightKeys, rightChildren)
+    | FOUND_WITH_CHILDREN {leftKeys, leftChildren, rightKeys, rightChildren} =>
+        decideGetPrefixSubtrieDirection
+          (prefix, keyPos, leftKeys, leftChildren, rightKeys, rightChildren)
+    | FOUND => NONE
+
+  fun getPrefixSubtrie (prefix, trie) =
+    if isEmpty trie then NONE else recurseGetPrefixSubtrie (prefix, 0, trie)
 end
