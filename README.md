@@ -7,35 +7,63 @@ The signature provided is:
 ```
 signature STRING_SET =
 sig
+signature STRING_SET =
+sig
   (* the type of tries *)
   type t
 
   (* the empty trie *)
   val empty: t
 
-  (* returns true if the trie is empty *)
+  (* StringSet.isEmpty trie
+   * returns true if the trie is empty *)
   val isEmpty: t -> bool
 
-  (* creates a trie containing just a string *)
+  (* StringSet.fromString "hello world"
+   * creates a trie containing just a string *)
   val fromString: string -> t
 
-  (* returns true if the key was inserted into the trie *)
+  (* StringSet.exists ("hello world", trie)
+   * returns true if the key was inserted into the trie *)
   val exists: string * t -> bool
 
-  (* inserts a new string into the trie, returning a new trie *)
+  (* StringSet.insert ("myNewString", trie)
+   * inserts a new string into the trie, returning a new trie *)
   val insert: string * t -> t
 
-  (* removes the key from the trie, returning a new trie *)
+  (* StringSet.remove ("stringToRemove", trie)
+   * removes the key from the trie, returning a new trie *)
   val remove: string * t -> t
 
-  (* returns a list of all keys matching the specified prefix *)
+  (* StringSet.getPrefixList ("myPrefix", trie)
+   * returns a list of all keys matching the specified prefix *)
   val getPrefixList: string * t -> string list
 
-  (* returns a list containing all keys in the trie *)
+  (* StringSet.toList trie
+   * returns a list containing all keys in the trie *)
   val toList: t -> string list
 
-  (* returns a trie containing all keys in the string list *)
+  (* StringSet.fromList ["hello", "world"]
+   * returns a trie containing all keys in the string list *)
   val fromList: string list -> t
+
+  (* StringSet.foldl (fn (key, acc) => String.size key + acc) 0 trie
+   * folds a value through the trie, from lowest to highest. *)
+  val foldl: (string * 'b -> 'b) -> 'b -> t -> 'b
+
+  (* StringSet.foldlWithPrefix (fn (key, acc) => String.size key + acc) 0 trie "myPrefix"
+   * folds a value through a subset of the trie containing the specified prefix,
+   * from lowest to highest. *)
+  val foldlWithPrefix: (string * 'b -> 'b) -> 'b -> t -> string -> 'b
+
+  (* StringSet.foldr (fn (key, acc) => String.size key + acc) 0 trie
+   * folds a value through the trie, from highest to lowest. *)
+  val foldr: (string * 'b -> 'b) -> 'b -> t -> 'b
+
+  (* StringSet.foldrWithPrefix (fn (key, acc) => String.size key + acc) 0 trie "myPrefix"
+   * folds a value through a subset of the trie containing the specified prefix,
+   * from highest to lowest. *)
+  val foldrWithPrefix: (string * 'b -> 'b) -> 'b -> t -> string -> 'b
 end
 ```
 
@@ -43,7 +71,7 @@ The reason for implementing a new trie specialised to strings rather than using 
 
 # To-do
 
-- [ ] Add `foldl`, `foldr`, `foldlWithPrefix`, `foldrWithPrefix` functions to string set
+- [x] Add `foldl`, `foldr`, `foldlWithPrefix`, `foldrWithPrefix` functions to string set
 - [ ] Benchmarks (possibly comparing to a set of strings in a balanced binary tree)
 - [ ] Use unrolled linked list with zipper in trie, to limit size of vector as allocating large vectors repeatedly is expensive
 - [ ] Implement StringMap, containing both keys and values

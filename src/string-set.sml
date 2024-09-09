@@ -6,29 +6,55 @@ sig
   (* the empty trie *)
   val empty: t
 
-  (* returns true if the trie is empty *)
+  (* StringSet.isEmpty trie
+   * returns true if the trie is empty *)
   val isEmpty: t -> bool
 
-  (* creates a trie containing just a string *)
+  (* StringSet.fromString "hello world"
+   * creates a trie containing just a string *)
   val fromString: string -> t
 
-  (* returns true if the key was inserted into the trie *)
+  (* StringSet.exists ("hello world", trie)
+   * returns true if the key was inserted into the trie *)
   val exists: string * t -> bool
 
-  (* inserts a new string into the trie, returning a new trie *)
+  (* StringSet.insert ("myNewString", trie)
+   * inserts a new string into the trie, returning a new trie *)
   val insert: string * t -> t
 
-  (* removes the key from the trie, returning a new trie *)
+  (* StringSet.remove ("stringToRemove", trie)
+   * removes the key from the trie, returning a new trie *)
   val remove: string * t -> t
 
-  (* returns a list of all keys matching the specified prefix *)
+  (* StringSet.getPrefixList ("myPrefix", trie)
+   * returns a list of all keys matching the specified prefix *)
   val getPrefixList: string * t -> string list
 
-  (* returns a list containing all keys in the trie *)
+  (* StringSet.toList trie
+   * returns a list containing all keys in the trie *)
   val toList: t -> string list
 
-  (* returns a trie containing all keys in the string list *)
+  (* StringSet.fromList ["hello", "world"]
+   * returns a trie containing all keys in the string list *)
   val fromList: string list -> t
+
+  (* StringSet.foldl (fn (key, acc) => String.size key + acc) 0 trie
+   * folds a value through the trie, from lowest to highest. *)
+  val foldl: (string * 'b -> 'b) -> 'b -> t -> 'b
+
+  (* StringSet.foldlWithPrefix (fn (key, acc) => String.size key + acc) 0 trie "myPrefix"
+   * folds a value through a subset of the trie containing the specified prefix,
+   * from lowest to highest. *)
+  val foldlWithPrefix: (string * 'b -> 'b) -> 'b -> t -> string -> 'b
+
+  (* StringSet.foldr (fn (key, acc) => String.size key + acc) 0 trie
+   * folds a value through the trie, from highest to lowest. *)
+  val foldr: (string * 'b -> 'b) -> 'b -> t -> 'b
+
+  (* StringSet.foldrWithPrefix (fn (key, acc) => String.size key + acc) 0 trie "myPrefix"
+   * folds a value through a subset of the trie containing the specified prefix,
+   * from highest to lowest. *)
+  val foldrWithPrefix: (string * 'b -> 'b) -> 'b -> t -> string -> 'b
 end
 
 structure StringSet: STRING_SET =
@@ -227,6 +253,75 @@ struct
     else
       PREFIX_MATCHES_WHOLE_TRIE
 
+  fun helpFoldlTrieVector (f, pos, keys, children, acc) =
+    if pos = Vector.length children then
+      acc
+    else
+      let
+        val curChild = Vector.sub (children, pos)
+        val acc = helpFoldl (f, curChild, acc)
+        val acc =
+          if isFoundNode curChild then f (Vector.sub (keys, pos), acc) else acc
+      in
+        helpFoldlTrieVector (f, pos + 1, keys, children, acc)
+      end
+
+  and helpFoldl (f, trie, acc) =
+    case trie of
+      CHILDREN {keys, children} =>
+        helpFoldlTrieVector (f, 0, keys, children, acc)
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        helpFoldlTrieVector (f, 0, keys, children, acc)
+    | FOUND => acc
+
+  fun foldl f initial trie = helpFoldl (f, trie, initial)
+
+  fun foldlWithPrefix f initial trie prefix =
+    case getPrefixSubtrie (prefix, trie) of
+      PREFIX_FOUND (prefix, subtrie) =>
+        let val acc = helpFoldl (f, subtrie, initial)
+        in if isFoundNode subtrie then f (prefix, acc) else acc
+        end
+    | NO_PREFIX_FOUND => initial
+    | PREFIX_MATCHES_WHOLE_TRIE => helpFoldl (f, trie, initial)
+
+  fun helpFoldrTrieVector (f, pos, keys, children, acc) =
+    if pos < 0 then
+      acc
+    else
+      let
+        val curChild = Vector.sub (children, pos)
+        val acc = helpFoldr (f, curChild, acc)
+        val acc =
+          if isFoundNode curChild then f (Vector.sub (keys, pos), acc) else acc
+      in
+        helpFoldrTrieVector (f, pos - 1, keys, children, acc)
+      end
+
+  and helpFoldr (f, trie, acc) =
+    case trie of
+      CHILDREN {keys, children} =>
+        helpFoldrTrieVector (f, Vector.length keys - 1, keys, children, acc)
+    | FOUND_WITH_CHILDREN {keys, children} =>
+        helpFoldrTrieVector (f, Vector.length keys - 1, keys, children, acc)
+    | FOUND => acc
+
+  fun foldr f initial trie = helpFoldr (f, trie, initial)
+
+  fun foldrWithPrefix f initial trie prefix =
+    case getPrefixSubtrie (prefix, trie) of
+      PREFIX_FOUND (prefix, subtrie) =>
+        let val acc = helpFoldr (f, subtrie, initial)
+        in if isFoundNode subtrie then f (prefix, acc) else acc
+        end
+    | NO_PREFIX_FOUND => initial
+    | PREFIX_MATCHES_WHOLE_TRIE => helpFoldr (f, trie, initial)
+
+  (* recurseHelpGetPrefixList and helpGetPrefixList are basically manually coded
+   * foldr functions over the trie, applying the accumuluator to every found
+   * node, from right to left.
+   * No need to recode it as a usage of a generic foldr function though,
+   * because lower dispatch cost this way. *)
   fun recurseHelpGetPrefixList (pos, keys, children, acc) =
     if pos < 0 then
       acc
@@ -568,10 +663,7 @@ struct
         end
     | fromList ([]) = empty
 
-  datatype remove_result =
-    UNCHANGED
-  | MADE_EMPTY
-  | CHANGED of t
+  datatype remove_result = UNCHANGED | MADE_EMPTY | CHANGED of t
 
   (* should be called when there is a FULL_SEARCH_MATCH
    * and child is a terminal FOUND node *)
