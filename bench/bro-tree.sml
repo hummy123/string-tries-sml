@@ -54,4 +54,14 @@ struct
 
   fun insert (str, tree) =
     insRoot (ins (str, tree))
+
+  fun exists (str, tree) =
+    case tree of
+      N0 => false
+    | N1 t => exists (str, t)
+    | N2 (l, k, r) =>
+        if str < k then exists (str, l)
+        else if str > k then exists (str, r)
+        else true
+    | _ => raise Match
 end

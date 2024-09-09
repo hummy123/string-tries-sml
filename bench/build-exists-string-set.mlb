@@ -1,0 +1,10 @@
+$(SML_LIB)/basis/basis.mlb
+
+ann
+  "allowVectorExps true"
+in
+  words.sml
+end
+
+../src/string-set.sml
+build-exists-string-set.sml
