@@ -1,3 +1,5 @@
+(* generate a words.sml file with a vector of strings, 
+ * from a line-delimited words.txt file *)
 val inIo = TextIO.openIn "words.txt"
 val outIO = TextIO.openOut "words.sml"
 
@@ -11,11 +13,14 @@ fun writeLines (outIO, lst) =
     [] => ()
   | word :: tl =>
       let
-        val word = String.substring (word, 0, String.size word - 2)
-        val isLast = tl = []
+        (* remove \r and \n from the word *)
+        val word = Substring.full word
         val word =
-          if isLast then "\"" ^ word ^ "\""
-          else "\"" ^ word ^ "\",\n"
+          Substring.dropr (fn chr => chr = #"\n" orelse chr = #"\r") word
+        val word = Substring.string word
+
+        val isLast = tl = []
+        val word = if isLast then "\"" ^ word ^ "\"" else "\"" ^ word ^ "\",\n"
         val _ = TextIO.output (outIO, word)
       in
         writeLines (outIO, tl)

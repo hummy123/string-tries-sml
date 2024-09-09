@@ -78,4 +78,5 @@ The reason for implementing a new trie specialised to strings rather than using 
 
 # Credits
 
-The tests in `tests/string-set-tests.sml` were ported from [kpol's Trie data structure in C3](https://github.com/kpol/trie), although this is not true for the files in the `src/` directory.
+- The tests in `tests/string-set-tests.sml` were ported from [kpol's Trie data structure in C3](https://github.com/kpol/trie).
+- The words.txt dataset in `bench/words.txt` is from [this repository](https://github.com/dwyl/english-words).
