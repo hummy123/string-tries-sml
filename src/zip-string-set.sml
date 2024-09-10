@@ -413,4 +413,81 @@ struct
 
   fun getPrefixSubtrie (prefix, trie) =
     if isEmpty trie then NONE else recurseGetPrefixSubtrie (prefix, 0, trie)
+
+  datatype insert_string_match =
+    NO_INSERT_MATCH
+  | DIFFERENCE_FOUND_AT of int
+  | FULL_INSERT_MATCH
+  | INSERT_KEY_CONTAINS_TRIE_KEY
+  | TRIE_KEY_CONTAINS_INSERT_KEY
+
+  fun insertKeyMatch (insertKey, trieKey, keyPos) =
+    if
+      keyPos < String.size insertKey
+    then
+      if keyPos < String.size trieKey then
+        let
+          val searchChr = String.sub (insertKey, keyPos)
+          val trieChr = String.sub (trieKey, keyPos)
+        in
+          if searchChr = trieChr then
+            insertKeyMatch (insertKey, trieKey, keyPos + 1)
+          else
+            DIFFERENCE_FOUND_AT keyPos
+        end
+      else
+        INSERT_KEY_CONTAINS_TRIE_KEY
+    else if
+      keyPos = String.size insertKey
+    then
+      if keyPos < String.size trieKey then TRIE_KEY_CONTAINS_INSERT_KEY
+      else if keyPos = String.size trieKey then FULL_INSERT_MATCH
+      else INSERT_KEY_CONTAINS_TRIE_KEY
+    else (* implicit: keyPos > String.size insertKey *) if
+      keyPos <= String.size trieKey
+    then
+      TRIE_KEY_CONTAINS_INSERT_KEY
+    else
+      NO_INSERT_MATCH
+
+  datatype insert_bin_search_result =
+    INSERT_NEW_CHILD of int
+  | FOUND_INSERT_POS of int
+  | APPEND_NEW_CHILD
+
+  fun linearSearch (findChr, keyPos, idx, children) =
+    if idx = Vector.length children then
+      APPEND_NEW_CHILD
+    else
+      let
+        val curStr = Vector.sub (children, idx)
+        val curChr = String.sub (curStr, keyPos)
+      in
+        if curChr > findChr then INSERT_NEW_CHILD idx
+        else linearSearch (findChr, keyPos, idx + 1, children)
+      end
+
+  fun helpInsertBinSearch (findChr, keyPos, children, low, high) =
+    let
+      val mid = low + ((high - low) div 2)
+    in
+      if high >= low then
+        let
+          val midStr = Vector.sub (children, mid)
+          val midChr = String.sub (midStr, keyPos)
+        in
+          if midChr = findChr then
+            FOUND_INSERT_POS mid
+          else if midChr < findChr then
+            helpInsertBinSearch (findChr, keyPos, children, mid + 1, high)
+          else
+            helpInsertBinSearch (findChr, keyPos, children, low, mid - 1)
+        end
+      else
+        linearSearch (findChr, keyPos, if mid >= 0 then mid else 0, children)
+    end
+
+  fun insertBinSearch (findChr, keyPos, children) =
+    helpInsertBinSearch
+      (findChr, keyPos, children, 0, Vector.length children - 1)
 end
