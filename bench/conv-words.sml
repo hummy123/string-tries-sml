@@ -6,7 +6,7 @@ val outIO = TextIO.openOut "words.sml"
 fun consWordChrs (wordChrs, acc) =
   case wordChrs of
     [] => acc
-  | _ => (String.implode wordChrs) :: acc
+  | _ => (String.concat wordChrs) :: acc
 
 fun helpTokeniseLine (pos, wordChrs, line, acc) =
   if pos < 0 then
@@ -14,9 +14,13 @@ fun helpTokeniseLine (pos, wordChrs, line, acc) =
   else
     let
       val chr = String.sub (line, pos)
+      (* using Char.toString is necessary because it escapes double-quotes.
+       * Without escaping, there's a chance we will produce an invalid .sml file
+       * *)
+      val sChr = Char.toString chr
     in
       if Char.isPrint chr andalso not (Char.isSpace chr) then
-        helpTokeniseLine (pos - 1, chr :: wordChrs, line, acc)
+        helpTokeniseLine (pos - 1, sChr :: wordChrs, line, acc)
       else
         helpTokeniseLine (pos - 1, [], line, consWordChrs (wordChrs, acc))
     end
