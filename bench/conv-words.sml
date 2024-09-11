@@ -3,9 +3,30 @@
 val inIo = TextIO.openIn "words.txt"
 val outIO = TextIO.openOut "words.sml"
 
+fun consWordChrs (wordChrs, acc) =
+  case wordChrs of
+    [] => acc
+  | _ => (String.implode wordChrs) :: acc
+
+fun helpTokeniseLine (pos, wordChrs, line, acc) =
+  if pos < 0 then
+    consWordChrs (wordChrs, acc)
+  else
+    let
+      val chr = String.sub (line, pos)
+    in
+      if Char.isPrint chr andalso not (Char.isSpace chr) then
+        helpTokeniseLine (pos - 1, chr :: wordChrs, line, acc)
+      else
+        helpTokeniseLine (pos - 1, [], line, consWordChrs (wordChrs, acc))
+    end
+
+fun tokeniseLine (line, acc) =
+  helpTokeniseLine (String.size line - 1, [], line, acc)
+
 fun readLines (inIo, acc) =
   case TextIO.inputLine inIo of
-    SOME word => readLines (inIo, word :: acc)
+    SOME line => readLines (inIo, tokeniseLine (line, acc))
   | NONE => List.rev acc
 
 fun writeLines (outIO, lst) =
@@ -13,12 +34,6 @@ fun writeLines (outIO, lst) =
     [] => ()
   | word :: tl =>
       let
-        (* remove \r and \n from the word *)
-        val word = Substring.full word
-        val word =
-          Substring.dropr (fn chr => chr = #"\n" orelse chr = #"\r") word
-        val word = Substring.string word
-
         val isLast = tl = []
         val word = if isLast then "\"" ^ word ^ "\"" else "\"" ^ word ^ "\",\n"
         val _ = TextIO.output (outIO, word)
@@ -36,3 +51,5 @@ fun main () =
   in
     ()
   end
+
+val _ = main ()
