@@ -64,4 +64,24 @@ struct
         else if str > k then exists (str, r)
         else true
     | _ => raise Match
+
+  fun foldr (f, acc, tree: bro) =
+    case tree of
+      N0 => acc
+    | N1 t => foldr (f, acc, t)
+    | N2 (l, k, r) =>
+        let
+          val acc = foldr (f, acc, r)
+          val acc = f (k, acc)
+        in
+          foldr (f, acc, l)
+        end
+    | _ => raise Match
+
+  fun getPrefixList (prefix, tree) =
+    foldr
+      ( (fn (k, acc) => if String.isSubstring prefix k then k :: acc else acc)
+      , []
+      , tree
+      )
 end

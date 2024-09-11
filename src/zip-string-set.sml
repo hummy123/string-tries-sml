@@ -490,4 +490,34 @@ struct
   fun insertBinSearch (findChr, keyPos, children) =
     helpInsertBinSearch
       (findChr, keyPos, children, 0, Vector.length children - 1)
+
+  fun insertDifferenceFoundAtLeft
+    ( insKey
+    , insIdx
+    , splitTrieKeyStart
+    , trieChild
+    , childLeftKeys
+    , childLeftChildren
+    , childRightKeys
+    , childRightChildren
+    , parentKeys
+    , parentChildren
+    , parentConstructor
+    ) =
+    let
+      (* child node should always have CHILDREN case,
+       * because we are splitting prefix into two,
+       * when neither trieKey nor insKey match the prefix. *)
+      val childNode = CHILDREN {keys = childKeys, children = childChildren}
+      val keys =
+        Vector.mapi
+          (fn (idx, key) => if idx <> insIdx then key else splitTrieKeyStart)
+          parentKeys
+
+      val children =
+        Vector.mapi (fn (idx, elt) => if idx <> insIdx then elt else childNode)
+          parentChildren
+    in
+      parentConstructor {keys = keys, children = children}
+    end
 end
