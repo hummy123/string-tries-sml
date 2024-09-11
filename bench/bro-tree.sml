@@ -78,9 +78,25 @@ struct
         end
     | _ => raise Match
 
+  fun helpStartsWith (pos, prefix, key) =
+    if pos = String.size prefix then
+      true
+    else
+      let
+        val prefixChr = String.sub (prefix, pos)
+        val keyChr = String.sub (key, pos)
+      in
+        if keyChr = prefixChr then helpStartsWith (pos + 1, prefix, key)
+        else false
+      end
+
+  fun startsWith (prefix, key) =
+    if String.size prefix > String.size key then false
+    else helpStartsWith (0, prefix, key)
+
   fun getPrefixList (prefix, tree) =
     foldr
-      ( (fn (k, acc) => if String.isSubstring prefix k then k :: acc else acc)
+      ( (fn (k, acc) => if startsWith (prefix, k) then k :: acc else acc)
       , []
       , tree
       )

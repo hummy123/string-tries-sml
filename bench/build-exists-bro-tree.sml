@@ -23,7 +23,8 @@ struct
       val finishTime = Time.now ()
 
       val searchDuration = Time.- (finishTime, startTime)
-      val searchDuration = Time.toString searchDuration ^ "\n"
+      val searchDuration = Time.toMilliseconds searchDuration
+      val searchDuration = LargeInt.toString searchDuration ^ "\n"
     in
       print searchDuration
     end
